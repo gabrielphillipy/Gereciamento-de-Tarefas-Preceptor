@@ -1,16 +1,21 @@
-import React, { useMemo, useState } from "react";
+import React, { useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   BarChart3,
   CalendarDays,
   CheckCircle2,
   Clock3,
+  Edit3,
+  KanbanSquare,
   LogOut,
   Megaphone,
   Plus,
+  RotateCcw,
+  Save,
   Search,
   ShieldCheck,
   Sparkles,
+  Trash2,
   UserRound,
   UsersRound,
 } from "lucide-react";
@@ -19,6 +24,7 @@ import "./styles.css";
 type Role = "gestor" | "colaborador";
 type Status = "planejada" | "em-andamento" | "revisao" | "concluida";
 type Kind = "tarefa" | "reuniao" | "entrega";
+type ViewMode = "agenda" | "kanban";
 
 type User = {
   id: string;
@@ -40,7 +46,16 @@ type WorkItem = {
   priority: "Baixa" | "Media" | "Alta";
   project: string;
   notes: string;
+  createdAt: string;
+  updatedAt: string;
 };
+
+type WorkForm = Omit<WorkItem, "id" | "status" | "createdAt" | "updatedAt"> & {
+  status?: Status;
+};
+
+const STORAGE_ITEMS_KEY = "preceptor.workItems";
+const STORAGE_USER_KEY = "preceptor.currentUser";
 
 const users: User[] = [
   {
@@ -77,6 +92,9 @@ const users: User[] = [
   },
 ];
 
+const today = new Date().toISOString().slice(0, 10);
+const now = new Date().toISOString();
+
 const initialItems: WorkItem[] = [
   {
     id: 1,
@@ -89,6 +107,8 @@ const initialItems: WorkItem[] = [
     priority: "Alta",
     project: "Campanha Maio",
     notes: "Revisar temas, responsaveis e ordem das publicacoes.",
+    createdAt: now,
+    updatedAt: now,
   },
   {
     id: 2,
@@ -101,6 +121,8 @@ const initialItems: WorkItem[] = [
     priority: "Media",
     project: "Rotina semanal",
     notes: "Pauta: metas, gargalos e proximas entregas.",
+    createdAt: now,
+    updatedAt: now,
   },
   {
     id: 3,
@@ -113,6 +135,8 @@ const initialItems: WorkItem[] = [
     priority: "Alta",
     project: "Performance",
     notes: "Incluir analise por canal e sugestoes de melhoria.",
+    createdAt: now,
+    updatedAt: now,
   },
   {
     id: 4,
@@ -125,6 +149,8 @@ const initialItems: WorkItem[] = [
     priority: "Media",
     project: "Endomarketing",
     notes: "Priorizar banners de aviso e card para intranet.",
+    createdAt: now,
+    updatedAt: now,
   },
 ];
 
@@ -141,12 +167,55 @@ const kindLabel: Record<Kind, string> = {
   entrega: "Entrega",
 };
 
+const emptyForm: WorkForm = {
+  title: "",
+  ownerId: "bruno",
+  kind: "tarefa",
+  date: "2026-05-25",
+  time: "09:00",
+  priority: "Media",
+  project: "",
+  notes: "",
+};
+
+function loadItems() {
+  const stored = localStorage.getItem(STORAGE_ITEMS_KEY);
+  if (!stored) return initialItems;
+
+  try {
+    const parsed = JSON.parse(stored) as WorkItem[];
+    return Array.isArray(parsed) ? parsed : initialItems;
+  } catch {
+    return initialItems;
+  }
+}
+
+function loadCurrentUser() {
+  const stored = localStorage.getItem(STORAGE_USER_KEY);
+  if (!stored) return null;
+  return users.find((user) => user.id === stored) ?? null;
+}
+
 function App() {
-  const [currentUser, setCurrentUser] = useState<User | null>(null);
-  const [items, setItems] = useState<WorkItem[]>(initialItems);
+  const [currentUser, setCurrentUser] = useState<User | null>(() => loadCurrentUser());
+  const [items, setItems] = useState<WorkItem[]>(() => loadItems());
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_ITEMS_KEY, JSON.stringify(items));
+  }, [items]);
+
+  function login(user: User) {
+    localStorage.setItem(STORAGE_USER_KEY, user.id);
+    setCurrentUser(user);
+  }
+
+  function logout() {
+    localStorage.removeItem(STORAGE_USER_KEY);
+    setCurrentUser(null);
+  }
 
   if (!currentUser) {
-    return <Login onLogin={setCurrentUser} />;
+    return <Login onLogin={login} />;
   }
 
   return (
@@ -154,7 +223,7 @@ function App() {
       currentUser={currentUser}
       items={items}
       setItems={setItems}
-      onLogout={() => setCurrentUser(null)}
+      onLogout={logout}
     />
   );
 }
@@ -223,16 +292,16 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
         </div>
         <div className="preview-board">
           <div>
-            <strong>Agenda</strong>
-            <p>Reunioes, prazos e demandas em um fluxo unico.</p>
+            <strong>Agenda salva</strong>
+            <p>As demandas continuam no navegador mesmo apos recarregar a pagina.</p>
           </div>
           <div>
-            <strong>Equipe</strong>
-            <p>Gestor distribui tarefas e colaboradores acompanham status.</p>
+            <strong>Kanban</strong>
+            <p>Gestor e equipe acompanham status por etapa de trabalho.</p>
           </div>
           <div>
-            <strong>Entrega</strong>
-            <p>Visao clara de prioridade, responsavel e data final.</p>
+            <strong>Operacao</strong>
+            <p>Criar, editar, excluir e filtrar demandas sem backend por enquanto.</p>
           </div>
         </div>
       </section>
@@ -252,54 +321,114 @@ function Dashboard({
   onLogout: () => void;
 }) {
   const [query, setQuery] = useState("");
-  const [form, setForm] = useState({
-    title: "",
-    ownerId: "bruno",
-    kind: "tarefa" as Kind,
-    date: "2026-05-25",
-    time: "09:00",
-    priority: "Media" as WorkItem["priority"],
-    project: "",
-    notes: "",
-  });
+  const [viewMode, setViewMode] = useState<ViewMode>("agenda");
+  const [statusFilter, setStatusFilter] = useState<Status | "todos">("todos");
+  const [ownerFilter, setOwnerFilter] = useState("todos");
+  const [kindFilter, setKindFilter] = useState<Kind | "todos">("todos");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [form, setForm] = useState<WorkForm>(emptyForm);
 
   const visibleItems = useMemo(() => {
     return items
       .filter((item) =>
         currentUser.role === "gestor" ? true : item.ownerId === currentUser.id
       )
+      .filter((item) => statusFilter === "todos" || item.status === statusFilter)
+      .filter((item) => ownerFilter === "todos" || item.ownerId === ownerFilter)
+      .filter((item) => kindFilter === "todos" || item.kind === kindFilter)
       .filter((item) => {
         const owner = users.find((user) => user.id === item.ownerId)?.name ?? "";
-        const text = `${item.title} ${item.project} ${owner}`.toLowerCase();
+        const text = `${item.title} ${item.project} ${item.notes} ${owner}`.toLowerCase();
         return text.includes(query.toLowerCase());
       })
       .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
-  }, [currentUser, items, query]);
+  }, [currentUser, items, kindFilter, ownerFilter, query, statusFilter]);
 
   const metrics = {
     total: visibleItems.length,
     pending: visibleItems.filter((item) => item.status !== "concluida").length,
-    meetings: visibleItems.filter((item) => item.kind === "reuniao").length,
+    overdue: visibleItems.filter((item) => isOverdue(item)).length,
     deliveries: visibleItems.filter((item) => item.kind === "entrega").length,
   };
 
-  function addItem(event: React.FormEvent) {
+  const nextDue = visibleItems.filter((item) => item.status !== "concluida").slice(0, 3);
+
+  function resetForm() {
+    setForm(emptyForm);
+    setEditingId(null);
+  }
+
+  function saveItem(event: React.FormEvent) {
     event.preventDefault();
+    const timestamp = new Date().toISOString();
+
+    if (editingId) {
+      setItems((current) =>
+        current.map((item) =>
+          item.id === editingId
+            ? {
+                ...item,
+                ...form,
+                status: form.status ?? item.status,
+                updatedAt: timestamp,
+              }
+            : item
+        )
+      );
+      resetForm();
+      return;
+    }
+
     setItems((current) => [
       {
         id: Date.now(),
         ...form,
         status: "planejada",
+        createdAt: timestamp,
+        updatedAt: timestamp,
       },
       ...current,
     ]);
-    setForm((current) => ({ ...current, title: "", project: "", notes: "" }));
+    resetForm();
   }
 
   function updateStatus(id: number, status: Status) {
     setItems((current) =>
-      current.map((item) => (item.id === id ? { ...item, status } : item))
+      current.map((item) =>
+        item.id === id ? { ...item, status, updatedAt: new Date().toISOString() } : item
+      )
     );
+  }
+
+  function editItem(item: WorkItem) {
+    setEditingId(item.id);
+    setForm({
+      title: item.title,
+      ownerId: item.ownerId,
+      kind: item.kind,
+      date: item.date,
+      time: item.time,
+      priority: item.priority,
+      project: item.project,
+      notes: item.notes,
+      status: item.status,
+    });
+  }
+
+  function deleteItem(id: number) {
+    const item = items.find((current) => current.id === id);
+    if (!item) return;
+    const confirmed = window.confirm(`Excluir a demanda "${item.title}"?`);
+    if (!confirmed) return;
+    setItems((current) => current.filter((current) => current.id !== id));
+    if (editingId === id) resetForm();
+  }
+
+  function restoreSampleData() {
+    const confirmed = window.confirm("Restaurar os dados de exemplo e apagar alteracoes locais?");
+    if (!confirmed) return;
+    setItems(initialItems);
+    resetForm();
   }
 
   return (
@@ -314,9 +443,9 @@ function Dashboard({
             <CalendarDays size={18} />
             Agenda
           </a>
-          <a href="#tarefas">
-            <CheckCircle2 size={18} />
-            Tarefas
+          <a href="#kanban">
+            <KanbanSquare size={18} />
+            Kanban
           </a>
           <a href="#equipe">
             <UsersRound size={18} />
@@ -339,17 +468,22 @@ function Dashboard({
             <p className="eyebrow">Painel {currentUser.role}</p>
             <h2>Rotina de trabalho da equipe</h2>
           </div>
-          <div className="user-chip">
-            <UserRound size={18} />
-            <span>{currentUser.name}</span>
+          <div className="topbar-actions">
+            <button className="ghost-button icon-button" onClick={restoreSampleData} title="Restaurar dados">
+              <RotateCcw size={18} />
+            </button>
+            <div className="user-chip">
+              <UserRound size={18} />
+              <span>{currentUser.name}</span>
+            </div>
           </div>
         </header>
 
         <section className="metrics" id="indicadores">
           <Metric icon={<CalendarDays />} label="Eventos" value={metrics.total} />
           <Metric icon={<Clock3 />} label="Pendencias" value={metrics.pending} />
-          <Metric icon={<UsersRound />} label="Reunioes" value={metrics.meetings} />
-          <Metric icon={<Megaphone />} label="Entregas" value={metrics.deliveries} />
+          <Metric icon={<Megaphone />} label="Atrasadas" value={metrics.overdue} />
+          <Metric icon={<CheckCircle2 />} label="Entregas" value={metrics.deliveries} />
         </section>
 
         <section className="control-row">
@@ -358,40 +492,105 @@ function Dashboard({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar tarefa, projeto ou responsavel"
+              placeholder="Buscar tarefa, projeto, observacao ou responsavel"
             />
+          </div>
+          <div className="view-toggle" aria-label="Alternar visualizacao">
+            <button
+              className={viewMode === "agenda" ? "selected" : ""}
+              onClick={() => setViewMode("agenda")}
+            >
+              <CalendarDays size={17} />
+              Agenda
+            </button>
+            <button
+              className={viewMode === "kanban" ? "selected" : ""}
+              onClick={() => setViewMode("kanban")}
+            >
+              <KanbanSquare size={17} />
+              Kanban
+            </button>
           </div>
         </section>
 
+        <section className="filters-row">
+          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as Status | "todos")}>
+            <option value="todos">Todos os status</option>
+            <option value="planejada">Planejada</option>
+            <option value="em-andamento">Em andamento</option>
+            <option value="revisao">Revisao</option>
+            <option value="concluida">Concluida</option>
+          </select>
+          <select value={kindFilter} onChange={(event) => setKindFilter(event.target.value as Kind | "todos")}>
+            <option value="todos">Todos os tipos</option>
+            <option value="tarefa">Tarefa</option>
+            <option value="reuniao">Reuniao</option>
+            <option value="entrega">Entrega</option>
+          </select>
+          {currentUser.role === "gestor" ? (
+            <select value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
+              <option value="todos">Todos os responsaveis</option>
+              {users
+                .filter((user) => user.role === "colaborador")
+                .map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+            </select>
+          ) : null}
+        </section>
+
         <section className="main-grid">
-          <div className="agenda-panel" id="agenda">
+          <div className="agenda-panel" id={viewMode === "agenda" ? "agenda" : "kanban"}>
             <div className="section-heading">
               <div>
-                <p className="eyebrow">Agenda</p>
-                <h3>Proximos compromissos</h3>
+                <p className="eyebrow">{viewMode === "agenda" ? "Agenda" : "Kanban"}</p>
+                <h3>{viewMode === "agenda" ? "Proximos compromissos" : "Fluxo de trabalho"}</h3>
               </div>
+              <span className="save-hint">Salvo neste navegador</span>
             </div>
-            <div className="timeline">
-              {visibleItems.map((item) => (
-                <WorkCard
-                  key={item.id}
-                  item={item}
-                  canEdit={currentUser.role === "gestor" || item.ownerId === currentUser.id}
-                  onStatusChange={updateStatus}
-                />
-              ))}
-            </div>
+
+            {visibleItems.length === 0 ? (
+              <div className="empty-state">
+                <strong>Nenhuma demanda encontrada</strong>
+                <p>Ajuste os filtros ou crie uma nova atividade para a equipe.</p>
+              </div>
+            ) : viewMode === "agenda" ? (
+              <div className="timeline">
+                {visibleItems.map((item) => (
+                  <WorkCard
+                    key={item.id}
+                    item={item}
+                    compact={false}
+                    canManage={currentUser.role === "gestor"}
+                    canEditStatus={currentUser.role === "gestor" || item.ownerId === currentUser.id}
+                    onStatusChange={updateStatus}
+                    onEdit={editItem}
+                    onDelete={deleteItem}
+                  />
+                ))}
+              </div>
+            ) : (
+              <KanbanBoard
+                items={visibleItems}
+                currentUser={currentUser}
+                onStatusChange={updateStatus}
+                onEdit={editItem}
+                onDelete={deleteItem}
+              />
+            )}
           </div>
 
           <div className="side-panel">
             {currentUser.role === "gestor" ? (
-              <form className="create-form" onSubmit={addItem}>
+              <form className="create-form" onSubmit={saveItem}>
                 <div className="section-heading compact">
                   <div>
-                    <p className="eyebrow">Gestor</p>
-                    <h3>Demandar atividade</h3>
+                    <p className="eyebrow">{editingId ? "Edicao" : "Gestor"}</p>
+                    <h3>{editingId ? "Editar demanda" : "Demandar atividade"}</h3>
                   </div>
-                  <Plus size={20} />
+                  {editingId ? <Save size={20} /> : <Plus size={20} />}
                 </div>
                 <label>
                   Titulo
@@ -448,6 +647,22 @@ function Dashboard({
                     </select>
                   </label>
                 </div>
+                {editingId ? (
+                  <label>
+                    Status
+                    <select
+                      value={form.status}
+                      onChange={(event) =>
+                        setForm({ ...form, status: event.target.value as Status })
+                      }
+                    >
+                      <option value="planejada">Planejada</option>
+                      <option value="em-andamento">Em andamento</option>
+                      <option value="revisao">Revisao</option>
+                      <option value="concluida">Concluida</option>
+                    </select>
+                  </label>
+                ) : null}
                 <div className="form-pair">
                   <label>
                     Data
@@ -484,9 +699,16 @@ function Dashboard({
                     placeholder="Contexto, briefing ou link"
                   />
                 </label>
-                <button className="primary-button" type="submit">
-                  Criar demanda
-                </button>
+                <div className="form-actions">
+                  <button className="primary-button" type="submit">
+                    {editingId ? "Salvar alteracoes" : "Criar demanda"}
+                  </button>
+                  {editingId ? (
+                    <button className="ghost-button" type="button" onClick={resetForm}>
+                      Cancelar
+                    </button>
+                  ) : null}
+                </div>
               </form>
             ) : (
               <div className="create-form collaborator-note">
@@ -498,6 +720,21 @@ function Dashboard({
                 </p>
               </div>
             )}
+
+            <div className="team-panel">
+              <p className="eyebrow">Alertas</p>
+              <h3>Proximos prazos</h3>
+              {nextDue.length ? (
+                nextDue.map((item) => (
+                  <div className="alert-row" key={item.id}>
+                    <span>{item.title}</span>
+                    <small>{formatDate(item.date)} as {item.time}</small>
+                  </div>
+                ))
+              ) : (
+                <p className="muted-text">Nada pendente nos filtros atuais.</p>
+              )}
+            </div>
 
             <div className="team-panel" id="equipe">
               <p className="eyebrow">Equipe</p>
@@ -536,53 +773,133 @@ function Metric({
   );
 }
 
-function WorkCard({
-  item,
-  canEdit,
+function KanbanBoard({
+  items,
+  currentUser,
   onStatusChange,
+  onEdit,
+  onDelete,
 }: {
-  item: WorkItem;
-  canEdit: boolean;
+  items: WorkItem[];
+  currentUser: User;
   onStatusChange: (id: number, status: Status) => void;
+  onEdit: (item: WorkItem) => void;
+  onDelete: (id: number) => void;
 }) {
-  const owner = users.find((user) => user.id === item.ownerId);
+  const columns: Status[] = ["planejada", "em-andamento", "revisao", "concluida"];
 
   return (
-    <article className={`work-card priority-${item.priority.toLowerCase()}`} id="tarefas">
-      <div className="card-date">
-        <strong>{new Date(`${item.date}T00:00:00`).toLocaleDateString("pt-BR", {
-          day: "2-digit",
-          month: "short",
-        })}</strong>
-        <span>{item.time}</span>
-      </div>
+    <div className="kanban-board">
+      {columns.map((status) => {
+        const columnItems = items.filter((item) => item.status === status);
+        return (
+          <section className="kanban-column" key={status}>
+            <div className="kanban-heading">
+              <strong>{statusLabel[status]}</strong>
+              <span>{columnItems.length}</span>
+            </div>
+            <div className="kanban-list">
+              {columnItems.map((item) => (
+                <WorkCard
+                  key={item.id}
+                  item={item}
+                  compact
+                  canManage={currentUser.role === "gestor"}
+                  canEditStatus={currentUser.role === "gestor" || item.ownerId === currentUser.id}
+                  onStatusChange={onStatusChange}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                />
+              ))}
+            </div>
+          </section>
+        );
+      })}
+    </div>
+  );
+}
+
+function WorkCard({
+  item,
+  compact,
+  canManage,
+  canEditStatus,
+  onStatusChange,
+  onEdit,
+  onDelete,
+}: {
+  item: WorkItem;
+  compact: boolean;
+  canManage: boolean;
+  canEditStatus: boolean;
+  onStatusChange: (id: number, status: Status) => void;
+  onEdit: (item: WorkItem) => void;
+  onDelete: (id: number) => void;
+}) {
+  const owner = users.find((user) => user.id === item.ownerId);
+  const overdue = isOverdue(item);
+
+  return (
+    <article className={`work-card priority-${item.priority.toLowerCase()} ${compact ? "compact-card" : ""}`}>
+      {!compact ? (
+        <div className="card-date">
+          <strong>{formatDate(item.date, true)}</strong>
+          <span>{item.time}</span>
+        </div>
+      ) : null}
       <div className="card-content">
         <div className="card-header">
           <span className={`pill kind-${item.kind}`}>{kindLabel[item.kind]}</span>
           <span className={`pill status-${item.status}`}>{statusLabel[item.status]}</span>
+          {overdue ? <span className="pill danger-pill">Atrasada</span> : null}
         </div>
         <h4>{item.title}</h4>
         <p>{item.notes}</p>
         <div className="meta-line">
           <span>{owner?.name}</span>
           <span>{item.project || "Sem projeto"}</span>
+          <span>{formatDate(item.date)} as {item.time}</span>
           <span>Prioridade {item.priority}</span>
         </div>
-        {canEdit ? (
-          <select
-            className="status-select"
-            value={item.status}
-            onChange={(event) => onStatusChange(item.id, event.target.value as Status)}
-          >
-            <option value="planejada">Planejada</option>
-            <option value="em-andamento">Em andamento</option>
-            <option value="revisao">Revisao</option>
-            <option value="concluida">Concluida</option>
-          </select>
-        ) : null}
+        <div className="card-actions">
+          {canEditStatus ? (
+            <select
+              className="status-select"
+              value={item.status}
+              onChange={(event) => onStatusChange(item.id, event.target.value as Status)}
+            >
+              <option value="planejada">Planejada</option>
+              <option value="em-andamento">Em andamento</option>
+              <option value="revisao">Revisao</option>
+              <option value="concluida">Concluida</option>
+            </select>
+          ) : null}
+          {canManage ? (
+            <div className="icon-actions">
+              <button className="ghost-button icon-button" onClick={() => onEdit(item)} title="Editar">
+                <Edit3 size={16} />
+              </button>
+              <button className="danger-button icon-button" onClick={() => onDelete(item.id)} title="Excluir">
+                <Trash2 size={16} />
+              </button>
+            </div>
+          ) : null}
+        </div>
       </div>
     </article>
   );
+}
+
+function formatDate(date: string, short = false) {
+  return new Date(`${date}T00:00:00`).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: short ? "short" : "2-digit",
+    year: short ? undefined : "numeric",
+  });
+}
+
+function isOverdue(item: WorkItem) {
+  return item.status !== "concluida" && item.date < today;
 }
 
 createRoot(document.getElementById("root")!).render(<App />);

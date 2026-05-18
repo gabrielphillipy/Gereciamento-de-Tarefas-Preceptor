@@ -144,6 +144,19 @@ textarea:focus {
   color: #24313d;
 }
 
+.danger-button {
+  min-height: 44px;
+  border: 0;
+  border-radius: 8px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  background: #f8e6e3;
+  color: #b42318;
+  font-weight: 900;
+}
+
 .form-error {
   margin: 0;
   color: #b42318;
@@ -268,7 +281,10 @@ nav a:hover {
 .control-row,
 .section-heading,
 .card-header,
-.meta-line {
+.meta-line,
+.topbar-actions,
+.card-actions,
+.icon-actions {
   display: flex;
   align-items: center;
 }
@@ -295,6 +311,16 @@ nav a:hover {
   background: #ffffff;
   border: 1px solid #d8e0e6;
   font-weight: 850;
+}
+
+.topbar-actions {
+  gap: 10px;
+}
+
+.icon-button {
+  width: 42px;
+  min-height: 42px;
+  padding: 0;
 }
 
 .metrics {
@@ -342,6 +368,7 @@ nav a:hover {
 
 .control-row {
   justify-content: space-between;
+  gap: 14px;
   margin-bottom: 18px;
 }
 
@@ -360,6 +387,40 @@ nav a:hover {
   border: 0;
   box-shadow: none;
   padding-left: 0;
+}
+
+.view-toggle {
+  display: inline-flex;
+  gap: 4px;
+  padding: 4px;
+  border: 1px solid #d8e0e6;
+  border-radius: 8px;
+  background: #ffffff;
+}
+
+.view-toggle button {
+  min-height: 38px;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  border: 0;
+  border-radius: 7px;
+  padding: 0 12px;
+  background: transparent;
+  color: #40515f;
+  font-weight: 900;
+}
+
+.view-toggle button.selected {
+  background: #17212b;
+  color: #ffffff;
+}
+
+.filters-row {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(180px, 1fr));
+  gap: 12px;
+  margin-bottom: 18px;
 }
 
 .main-grid {
@@ -401,6 +462,28 @@ nav a:hover {
   gap: 14px;
 }
 
+.save-hint {
+  color: #5b6b78;
+  font-size: 0.82rem;
+  font-weight: 850;
+}
+
+.empty-state {
+  display: grid;
+  place-items: center;
+  min-height: 260px;
+  padding: 24px;
+  border: 1px dashed #cbd5dc;
+  border-radius: 8px;
+  color: #5b6b78;
+  text-align: center;
+}
+
+.empty-state strong {
+  color: #17212b;
+  font-size: 1.1rem;
+}
+
 .work-card {
   display: grid;
   grid-template-columns: 96px 1fr;
@@ -409,6 +492,23 @@ nav a:hover {
   border-radius: 8px;
   border: 1px solid #d8e0e6;
   background: #fbfcfd;
+}
+
+.compact-card {
+  grid-template-columns: 1fr;
+  padding: 12px;
+}
+
+.priority-alta {
+  border-left: 4px solid #b42318;
+}
+
+.priority-media {
+  border-left: 4px solid #d09b22;
+}
+
+.priority-baixa {
+  border-left: 4px solid #0f6b70;
 }
 
 .card-date {
@@ -480,6 +580,11 @@ nav a:hover {
   color: #247a38;
 }
 
+.danger-pill {
+  background: #f8e6e3;
+  color: #b42318;
+}
+
 .card-content h4 {
   margin-bottom: 8px;
   font-size: 1.05rem;
@@ -509,8 +614,17 @@ nav a:hover {
 }
 
 .status-select {
-  margin-top: 12px;
   max-width: 220px;
+}
+
+.card-actions {
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.icon-actions {
+  gap: 8px;
 }
 
 .side-panel {
@@ -527,6 +641,12 @@ nav a:hover {
   display: grid;
   grid-template-columns: 1fr 1fr;
   gap: 12px;
+}
+
+.form-actions {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 10px;
 }
 
 .collaborator-note p:last-child {
@@ -561,6 +681,71 @@ nav a:hover {
   font-weight: 800;
 }
 
+.alert-row {
+  display: grid;
+  gap: 4px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #fff8e8;
+  border: 1px solid #f0dbad;
+}
+
+.alert-row span {
+  font-weight: 900;
+}
+
+.alert-row small,
+.muted-text {
+  color: #5b6b78;
+  font-weight: 750;
+}
+
+.kanban-board {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(220px, 1fr));
+  gap: 14px;
+  overflow-x: auto;
+  padding-bottom: 6px;
+}
+
+.kanban-column {
+  min-width: 220px;
+  display: grid;
+  align-content: start;
+  gap: 12px;
+  padding: 12px;
+  border-radius: 8px;
+  background: #eef2f5;
+  border: 1px solid #d8e0e6;
+}
+
+.kanban-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.kanban-heading strong {
+  font-size: 0.92rem;
+}
+
+.kanban-heading span {
+  min-width: 28px;
+  height: 28px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: #ffffff;
+  color: #40515f;
+  font-weight: 900;
+}
+
+.kanban-list {
+  display: grid;
+  gap: 10px;
+}
+
 @media (max-width: 1040px) {
   .app-shell {
     grid-template-columns: 1fr;
@@ -573,6 +758,10 @@ nav a:hover {
 
   .main-grid {
     grid-template-columns: 1fr;
+  }
+
+  .kanban-board {
+    grid-template-columns: repeat(4, minmax(240px, 1fr));
   }
 }
 
@@ -598,7 +787,35 @@ nav a:hover {
     flex-direction: column;
   }
 
+  .control-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .view-toggle,
+  .view-toggle button {
+    width: 100%;
+  }
+
+  .view-toggle button {
+    justify-content: center;
+  }
+
+  .filters-row,
+  .form-actions {
+    grid-template-columns: 1fr;
+  }
+
   .work-card {
     grid-template-columns: 1fr;
+  }
+
+  .card-actions {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .status-select {
+    max-width: none;
   }
 }
