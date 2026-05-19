@@ -251,20 +251,23 @@ nav {
   gap: 8px;
 }
 
-nav a {
+nav button {
   min-height: 42px;
   display: flex;
   align-items: center;
   gap: 10px;
+  border: 0;
   padding: 0 12px;
   border-radius: 8px;
+  background: transparent;
   color: #dbe5eb;
   text-decoration: none;
   font-weight: 800;
+  text-align: left;
 }
 
-nav a.active,
-nav a:hover {
+nav button.active,
+nav button:hover {
   background: #24313d;
   color: #ffffff;
 }

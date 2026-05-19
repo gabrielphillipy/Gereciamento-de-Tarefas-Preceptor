@@ -25,6 +25,7 @@ type Role = "gestor" | "colaborador";
 type Status = "planejada" | "em-andamento" | "revisao" | "concluida";
 type Kind = "tarefa" | "reuniao" | "entrega";
 type ViewMode = "agenda" | "kanban";
+type NavSection = "agenda" | "kanban" | "equipe" | "indicadores";
 
 type User = {
   id: string;
@@ -322,6 +323,7 @@ function Dashboard({
 }) {
   const [query, setQuery] = useState("");
   const [viewMode, setViewMode] = useState<ViewMode>("agenda");
+  const [activeNav, setActiveNav] = useState<NavSection>("agenda");
   const [statusFilter, setStatusFilter] = useState<Status | "todos">("todos");
   const [ownerFilter, setOwnerFilter] = useState("todos");
   const [kindFilter, setKindFilter] = useState<Kind | "todos">("todos");
@@ -431,6 +433,18 @@ function Dashboard({
     resetForm();
   }
 
+  function navigate(section: NavSection) {
+    setActiveNav(section);
+
+    if (section === "agenda" || section === "kanban") {
+      setViewMode(section);
+    }
+
+    window.requestAnimationFrame(() => {
+      document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" });
+    });
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -439,22 +453,22 @@ function Dashboard({
           <span>Preceptor</span>
         </div>
         <nav>
-          <a className="active" href="#agenda">
+          <button className={activeNav === "agenda" ? "active" : ""} onClick={() => navigate("agenda")}>
             <CalendarDays size={18} />
             Agenda
-          </a>
-          <a href="#kanban">
+          </button>
+          <button className={activeNav === "kanban" ? "active" : ""} onClick={() => navigate("kanban")}>
             <KanbanSquare size={18} />
             Kanban
-          </a>
-          <a href="#equipe">
+          </button>
+          <button className={activeNav === "equipe" ? "active" : ""} onClick={() => navigate("equipe")}>
             <UsersRound size={18} />
             Equipe
-          </a>
-          <a href="#indicadores">
+          </button>
+          <button className={activeNav === "indicadores" ? "active" : ""} onClick={() => navigate("indicadores")}>
             <BarChart3 size={18} />
             Indicadores
-          </a>
+          </button>
         </nav>
         <button className="ghost-button" onClick={onLogout}>
           <LogOut size={18} />
@@ -498,14 +512,14 @@ function Dashboard({
           <div className="view-toggle" aria-label="Alternar visualizacao">
             <button
               className={viewMode === "agenda" ? "selected" : ""}
-              onClick={() => setViewMode("agenda")}
+              onClick={() => navigate("agenda")}
             >
               <CalendarDays size={17} />
               Agenda
             </button>
             <button
               className={viewMode === "kanban" ? "selected" : ""}
-              onClick={() => setViewMode("kanban")}
+              onClick={() => navigate("kanban")}
             >
               <KanbanSquare size={17} />
               Kanban
@@ -542,7 +556,7 @@ function Dashboard({
         </section>
 
         <section className="main-grid">
-          <div className="agenda-panel" id={viewMode === "agenda" ? "agenda" : "kanban"}>
+          <div className="agenda-panel" id={viewMode}>
             <div className="section-heading">
               <div>
                 <p className="eyebrow">{viewMode === "agenda" ? "Agenda" : "Kanban"}</p>
