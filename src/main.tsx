@@ -354,10 +354,20 @@ function Dashboard({
   };
 
   const nextDue = visibleItems.filter((item) => item.status !== "concluida").slice(0, 3);
-  const teamStats = users
-    .filter((user) => user.role === "colaborador")
+  const visibleTeamUsers = users.filter((user) => {
+    if (user.role !== "colaborador") return false;
+    if (currentUser.role === "colaborador" && user.id !== currentUser.id) return false;
+    if (ownerFilter !== "todos" && user.id !== ownerFilter) return false;
+
+    const hasVisibleItems = visibleItems.some((item) => item.ownerId === user.id);
+    const queryMatchesUser = `${user.name} ${user.team}`.toLowerCase().includes(query.toLowerCase());
+
+    return query.trim() ? hasVisibleItems || queryMatchesUser : ownerFilter !== "todos" || hasVisibleItems;
+  });
+
+  const teamStats = visibleTeamUsers
     .map((user) => {
-      const assigned = items.filter((item) => item.ownerId === user.id);
+      const assigned = visibleItems.filter((item) => item.ownerId === user.id);
       return {
         user,
         total: assigned.length,
@@ -540,21 +550,33 @@ function Dashboard({
         </section>
 
         <section className="filters-row">
-          <select value={statusFilter} onChange={(event) => setStatusFilter(event.target.value as Status | "todos")}>
+          <select
+            aria-label="Filtro de status"
+            value={statusFilter}
+            onChange={(event) => setStatusFilter(event.target.value as Status | "todos")}
+          >
             <option value="todos">Todos os status</option>
             <option value="planejada">Planejada</option>
             <option value="em-andamento">Em andamento</option>
             <option value="revisao">Revisao</option>
             <option value="concluida">Concluida</option>
           </select>
-          <select value={kindFilter} onChange={(event) => setKindFilter(event.target.value as Kind | "todos")}>
+          <select
+            aria-label="Filtro de tipo"
+            value={kindFilter}
+            onChange={(event) => setKindFilter(event.target.value as Kind | "todos")}
+          >
             <option value="todos">Todos os tipos</option>
             <option value="tarefa">Tarefa</option>
             <option value="reuniao">Reuniao</option>
             <option value="entrega">Entrega</option>
           </select>
           {currentUser.role === "gestor" ? (
-            <select value={ownerFilter} onChange={(event) => setOwnerFilter(event.target.value)}>
+            <select
+              aria-label="Filtro de responsavel"
+              value={ownerFilter}
+              onChange={(event) => setOwnerFilter(event.target.value)}
+            >
               <option value="todos">Todos os responsaveis</option>
               {users
                 .filter((user) => user.role === "colaborador")
@@ -568,7 +590,7 @@ function Dashboard({
         </section>
 
         {activeNav === "equipe" ? (
-          <TeamPage stats={teamStats} items={items} />
+          <TeamPage stats={teamStats} items={visibleItems} />
         ) : activeNav === "indicadores" ? (
           <IndicatorsPage metrics={metrics} statusStats={statusStats} visibleItems={visibleItems} />
         ) : (
@@ -808,8 +830,14 @@ function TeamPage({
           <h3>Capacidade e responsabilidades</h3>
         </div>
       </div>
-      <div className="team-grid">
-        {stats.map(({ user, total, pending, overdue, done }) => {
+      {stats.length === 0 ? (
+        <div className="empty-state">
+          <strong>Nenhum colaborador encontrado</strong>
+          <p>Altere os filtros para ver a carga de trabalho da equipe.</p>
+        </div>
+      ) : (
+        <div className="team-grid">
+          {stats.map(({ user, total, pending, overdue, done }) => {
           const assigned = items
             .filter((item) => item.ownerId === user.id && item.status !== "concluida")
             .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))
@@ -844,8 +872,9 @@ function TeamPage({
               </div>
             </article>
           );
-        })}
-      </div>
+          })}
+        </div>
+      )}
     </section>
   );
 }

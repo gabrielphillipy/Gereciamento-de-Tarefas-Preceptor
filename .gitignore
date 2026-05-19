@@ -4,5 +4,7 @@ dist
 .env
 .env.local
 npm-debug.log*
+test-results
+playwright-report
 
 .vercel
