@@ -13,7 +13,6 @@ import {
   RotateCcw,
   Save,
   Search,
-  ShieldCheck,
   Sparkles,
   Trash2,
   UserRound,
@@ -254,7 +253,7 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
     <main className="login-shell">
       <section className="login-panel">
         <div className="brand-mark">
-          <ShieldCheck size={28} />
+          <span>P!</span>
         </div>
         <p className="eyebrow">Preceptor Tasks</p>
         <h1>Gestao de tarefas, agenda e entregas da equipe</h1>
@@ -490,7 +489,7 @@ function Dashboard({
       <aside className="sidebar">
         <div className="side-brand">
           <div className="brand-icon">
-            <ShieldCheck size={22} />
+            <span>P!</span>
           </div>
           <div>
             <span>Preceptor</span>
