@@ -337,6 +337,7 @@ function Dashboard({
   const [kindFilter, setKindFilter] = useState<Kind | "todos">("todos");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
+  const [selectedDate, setSelectedDate] = useState(today);
   const [form, setForm] = useState<WorkForm>(emptyForm);
 
   const visibleItems = useMemo(() => {
@@ -641,20 +642,15 @@ function Dashboard({
                 <p>Ajuste os filtros ou crie uma nova atividade para a equipe.</p>
               </div>
             ) : viewMode === "agenda" ? (
-              <div className="timeline">
-                {visibleItems.map((item) => (
-                  <WorkCard
-                    key={item.id}
-                    item={item}
-                    compact={false}
-                    canManage={currentUser.role === "gestor"}
-                    canEditStatus={currentUser.role === "gestor" || item.ownerId === currentUser.id}
-                    onStatusChange={updateStatus}
-                    onEdit={editItem}
-                    onDelete={deleteItem}
-                  />
-                ))}
-              </div>
+              <CalendarView
+                items={visibleItems}
+                selectedDate={selectedDate}
+                onSelectDate={setSelectedDate}
+                currentUser={currentUser}
+                onStatusChange={updateStatus}
+                onEdit={editItem}
+                onDelete={deleteItem}
+              />
             ) : (
               <KanbanBoard
                 items={visibleItems}
@@ -1002,6 +998,108 @@ function Metric({
   );
 }
 
+function CalendarView({
+  items,
+  selectedDate,
+  onSelectDate,
+  currentUser,
+  onStatusChange,
+  onEdit,
+  onDelete,
+}: {
+  items: WorkItem[];
+  selectedDate: string;
+  onSelectDate: (date: string) => void;
+  currentUser: User;
+  onStatusChange: (id: number, status: Status) => void;
+  onEdit: (item: WorkItem) => void;
+  onDelete: (id: number) => void;
+}) {
+  const referenceDate = items[0]?.date ?? selectedDate;
+  const monthDate = new Date(`${referenceDate}T00:00:00`);
+  const month = monthDate.getMonth();
+  const year = monthDate.getFullYear();
+  const days = buildCalendarDays(year, month);
+  const itemsByDate = groupItemsByDate(items);
+  const selectedItems = itemsByDate[selectedDate] ?? [];
+  const monthLabel = monthDate.toLocaleDateString("pt-BR", {
+    month: "long",
+    year: "numeric",
+  });
+
+  return (
+    <div className="calendar-layout">
+      <div className="calendar-panel" aria-label="Calendario mensal">
+        <div className="calendar-toolbar">
+          <div>
+            <span>Calendario mensal</span>
+            <strong>{monthLabel}</strong>
+          </div>
+          <button className="ghost-button" onClick={() => onSelectDate(today)}>
+            Hoje
+          </button>
+        </div>
+        <div className="calendar-weekdays">
+          {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"].map((day) => (
+            <span key={day}>{day}</span>
+          ))}
+        </div>
+        <div className="calendar-grid">
+          {days.map((day) => {
+            const dateItems = itemsByDate[day.date] ?? [];
+            const isCurrentMonth = day.month === month;
+            const isSelected = day.date === selectedDate;
+
+            return (
+              <button
+                className={`calendar-day ${isCurrentMonth ? "" : "outside-month"} ${isSelected ? "selected-day" : ""}`}
+                key={day.date}
+                onClick={() => onSelectDate(day.date)}
+              >
+                <span className="day-number">{day.label}</span>
+                <div className="day-events">
+                  {dateItems.slice(0, 2).map((item) => (
+                    <span className={`event-dot event-${item.kind}`} key={item.id}>
+                      {item.title}
+                    </span>
+                  ))}
+                  {dateItems.length > 2 ? <small>+{dateItems.length - 2}</small> : null}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <aside className="day-detail">
+        <p className="eyebrow">Dia selecionado</p>
+        <h3>{formatDate(selectedDate)}</h3>
+        {selectedItems.length ? (
+          <div className="day-list">
+            {selectedItems.map((item) => (
+              <WorkCard
+                key={item.id}
+                item={item}
+                compact
+                canManage={currentUser.role === "gestor"}
+                canEditStatus={currentUser.role === "gestor" || item.ownerId === currentUser.id}
+                onStatusChange={onStatusChange}
+                onEdit={onEdit}
+                onDelete={onDelete}
+              />
+            ))}
+          </div>
+        ) : (
+          <div className="empty-day">
+            <strong>Nada agendado</strong>
+            <p>Nenhuma demanda filtrada para este dia.</p>
+          </div>
+        )}
+      </aside>
+    </div>
+  );
+}
+
 function KanbanBoard({
   items,
   currentUser,
@@ -1125,6 +1223,39 @@ function formatDate(date: string, short = false) {
     month: short ? "short" : "2-digit",
     year: short ? undefined : "numeric",
   });
+}
+
+function groupItemsByDate(items: WorkItem[]) {
+  return items.reduce<Record<string, WorkItem[]>>((acc, item) => {
+    acc[item.date] = [...(acc[item.date] ?? []), item].sort((a, b) =>
+      a.time.localeCompare(b.time)
+    );
+    return acc;
+  }, {});
+}
+
+function buildCalendarDays(year: number, month: number) {
+  const firstDay = new Date(year, month, 1);
+  const start = new Date(year, month, 1 - firstDay.getDay());
+
+  return Array.from({ length: 42 }, (_, index) => {
+    const date = new Date(start);
+    date.setDate(start.getDate() + index);
+    const value = toDateInputValue(date);
+
+    return {
+      date: value,
+      label: String(date.getDate()),
+      month: date.getMonth(),
+    };
+  });
+}
+
+function toDateInputValue(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 function isOverdue(item: WorkItem) {

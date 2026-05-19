@@ -20,6 +20,17 @@ test("filtro de responsavel atualiza a tela de equipe", async ({ page }) => {
   await expect(teamPanel.getByText("2 total")).toBeVisible();
 });
 
+test("agenda mostra calendario mensal com eventos", async ({ page }) => {
+  await page.getByRole("navigation").getByRole("button", { name: "Agenda" }).click();
+  const calendar = page.getByLabel("Calendario mensal");
+
+  await expect(calendar).toBeVisible();
+  await expect(page.getByText("maio de 2026")).toBeVisible();
+  await expect(calendar.getByText("Ajustar calendario editorial do mes")).toBeVisible();
+  await calendar.getByRole("button", { name: /20 Ajustar calendario editorial do mes/ }).click();
+  await expect(page.getByRole("heading", { name: "Ajustar calendario editorial do mes" })).toBeVisible();
+});
+
 test("filtros alteram indicadores e kanban", async ({ page }) => {
   await page.getByLabel("Filtro de status").selectOption("revisao");
   await page.getByRole("navigation").getByRole("button", { name: "Indicadores" }).click();
