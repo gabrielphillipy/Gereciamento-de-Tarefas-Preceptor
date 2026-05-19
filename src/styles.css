@@ -1242,6 +1242,78 @@ nav button.active {
   font-size: 1.1rem;
 }
 
+.users-table {
+  display: grid;
+  gap: 12px;
+}
+
+.user-row-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  flex-wrap: wrap;
+  padding: 16px 18px;
+  border: 1px solid var(--line);
+  border-radius: 8px;
+  background: #ffffff;
+  box-shadow: 0 12px 24px rgba(23, 33, 43, 0.05);
+}
+
+.user-row-main {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  min-width: 220px;
+}
+
+.user-avatar {
+  width: 40px;
+  height: 40px;
+  display: grid;
+  place-items: center;
+  border-radius: 999px;
+  background: var(--brand-soft);
+  color: var(--brand);
+}
+
+.user-row-main strong {
+  display: block;
+  font-size: 1rem;
+}
+
+.user-row-main small {
+  color: #5b6b78;
+  font-weight: 700;
+}
+
+.user-row-controls {
+  display: flex;
+  align-items: flex-end;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.inline-field {
+  display: grid;
+  gap: 6px;
+  font-size: 0.78rem;
+  font-weight: 800;
+  color: #40515f;
+}
+
+.inline-field input,
+.inline-field select {
+  min-height: 40px;
+  min-width: 170px;
+}
+
+.inline-field select:disabled,
+.inline-field input:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
 @media (max-width: 1040px) {
   .app-shell {
     grid-template-columns: 1fr;

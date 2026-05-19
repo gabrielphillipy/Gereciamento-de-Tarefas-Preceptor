@@ -43,6 +43,27 @@ create policy "profiles_insert" on public.profiles
 create policy "profiles_update" on public.profiles
   for update to authenticated using (auth.uid() = id);
 
+-- Função auxiliar: verifica se o usuário atual é gestor.
+-- SECURITY DEFINER evita recursão de RLS ao consultar profiles de dentro
+-- de uma policy aplicada à própria tabela profiles.
+create or replace function public.is_gestor()
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.profiles where id = auth.uid() and role = 'gestor'
+  );
+$$;
+
+-- Perfis: gestor pode atualizar qualquer perfil (promover/rebaixar, editar equipe)
+create policy "profiles_gestor_update" on public.profiles
+  for update to authenticated
+  using (public.is_gestor())
+  with check (public.is_gestor());
+
 -- Work items: gestor tem acesso total
 create policy "work_items_gestor_all" on public.work_items
   for all to authenticated

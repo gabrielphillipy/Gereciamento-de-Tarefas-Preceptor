@@ -12,6 +12,7 @@ import {
   Plus,
   Save,
   Search,
+  ShieldCheck,
   Sparkles,
   Trash2,
   UserRound,
@@ -27,7 +28,7 @@ type Role = "gestor" | "colaborador";
 type Status = "planejada" | "em-andamento" | "revisao" | "concluida";
 type Kind = "tarefa" | "reuniao" | "entrega";
 type ViewMode = "agenda" | "kanban";
-type NavSection = "agenda" | "kanban" | "equipe" | "indicadores";
+type NavSection = "agenda" | "kanban" | "equipe" | "indicadores" | "usuarios";
 
 type User = {
   id: string;
@@ -63,14 +64,20 @@ const today = new Date().toISOString().slice(0, 10);
 const statusLabel: Record<Status, string> = {
   planejada: "Planejada",
   "em-andamento": "Em andamento",
-  revisao: "Revisao",
-  concluida: "Concluida",
+  revisao: "Revisão",
+  concluida: "Concluída",
 };
 
 const kindLabel: Record<Kind, string> = {
   tarefa: "Tarefa",
-  reuniao: "Reuniao",
+  reuniao: "Reunião",
   entrega: "Entrega",
+};
+
+const priorityLabel: Record<WorkItem["priority"], string> = {
+  Baixa: "Baixa",
+  Media: "Média",
+  Alta: "Alta",
 };
 
 // ─── Helpers de mapeamento DB → TS ───────────────────────────
@@ -130,6 +137,11 @@ function App() {
       .order("date")
       .order("time");
     if (data) setItems(data.map(mapItem));
+  }, []);
+
+  const fetchUsers = useCallback(async () => {
+    const { data } = await supabase.from("profiles").select("*");
+    if (data) setAllUsers(data.map(mapUser));
   }, []);
 
   const loadUserAndData = useCallback(async (userId: string) => {
@@ -195,6 +207,7 @@ function App() {
       allUsers={allUsers}
       items={items}
       onRefresh={fetchItems}
+      onRefreshUsers={fetchUsers}
       onLogout={logout}
     />
   );
@@ -207,7 +220,6 @@ function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [name, setName] = useState("");
-  const [role, setRole] = useState<Role>("colaborador");
   const [team, setTeam] = useState("");
   const [error, setError] = useState("");
   const [info, setInfo] = useState("");
@@ -257,7 +269,7 @@ function Login() {
       id: authData.user.id,
       name: name.trim(),
       email: email.trim(),
-      role,
+      role: "colaborador",
       team: team.trim(),
     });
 
@@ -282,7 +294,7 @@ function Login() {
           <span>P!</span>
         </div>
         <p className="eyebrow">Preceptor Tasks</p>
-        <h1>Gestao de tarefas, agenda e entregas da equipe</h1>
+        <h1>Gestão de tarefas, agenda e entregas da equipe</h1>
 
         <div className="auth-tabs">
           <button
@@ -356,29 +368,20 @@ function Login() {
               <input
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="minimo 6 caracteres"
+                placeholder="mínimo 6 caracteres"
                 type="password"
                 required
                 minLength={6}
               />
             </label>
-            <div className="form-pair">
-              <label>
-                Funcao
-                <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
-                  <option value="colaborador">Colaborador</option>
-                  <option value="gestor">Gestor</option>
-                </select>
-              </label>
-              <label>
-                Equipe
-                <input
-                  value={team}
-                  onChange={(e) => setTeam(e.target.value)}
-                  placeholder="Ex: Marketing"
-                />
-              </label>
-            </div>
+            <label>
+              Equipe
+              <input
+                value={team}
+                onChange={(e) => setTeam(e.target.value)}
+                placeholder="Ex: Marketing"
+              />
+            </label>
             {error ? <p className="form-error">{error}</p> : null}
             <button className="primary-button" type="submit" disabled={submitting}>
               {submitting ? "Criando conta..." : "Criar conta"}
@@ -395,21 +398,21 @@ function Login() {
         <div className="preview-board">
           <div>
             <strong>Agenda sincronizada</strong>
-            <p>Demandas salvas no banco de dados, acessiveis de qualquer dispositivo.</p>
+            <p>Demandas salvas no banco de dados, acessíveis de qualquer dispositivo.</p>
           </div>
           <div>
             <strong>Kanban</strong>
             <p>Gestor e equipe acompanham status por etapa de trabalho.</p>
           </div>
           <div>
-            <strong>Colaboracao</strong>
+            <strong>Colaboração</strong>
             <p>Gestor cria e distribui tarefas. Equipe atualiza o progresso em tempo real.</p>
           </div>
         </div>
         <div className="preview-metrics">
           <span>4 status de fluxo</span>
-          <span>Multi-usuario</span>
-          <span>Supabase</span>
+          <span>Multiusuário</span>
+          <span>Tempo real</span>
         </div>
       </section>
     </main>
@@ -423,12 +426,14 @@ function Dashboard({
   allUsers,
   items,
   onRefresh,
+  onRefreshUsers,
   onLogout,
 }: {
   currentUser: User;
   allUsers: User[];
   items: WorkItem[];
   onRefresh: () => Promise<void>;
+  onRefreshUsers: () => Promise<void>;
   onLogout: () => void;
 }) {
   const [query, setQuery] = useState("");
@@ -622,6 +627,15 @@ function Dashboard({
             <BarChart3 size={18} />
             Indicadores
           </button>
+          {currentUser.role === "gestor" ? (
+            <button
+              className={activeNav === "usuarios" ? "active" : ""}
+              onClick={() => navigate("usuarios")}
+            >
+              <ShieldCheck size={18} />
+              Usuários
+            </button>
+          ) : null}
         </nav>
         <button className="ghost-button" onClick={onLogout}>
           <LogOut size={18} />
@@ -633,7 +647,7 @@ function Dashboard({
         <header className="topbar">
           <div>
             <p className="eyebrow">Painel {currentUser.role}</p>
-            <h2>Central de operacao</h2>
+            <h2>Central de operação</h2>
             <p className="topbar-subtitle">
               Priorize demandas, acompanhe prazos e mantenha a equipe alinhada.
             </p>
@@ -654,7 +668,7 @@ function Dashboard({
 
         <section className="metrics">
           <Metric icon={<CalendarDays />} label="Eventos" value={metrics.total} />
-          <Metric icon={<Clock3 />} label="Pendencias" value={metrics.pending} />
+          <Metric icon={<Clock3 />} label="Pendências" value={metrics.pending} />
           <Metric icon={<Megaphone />} label="Atrasadas" value={metrics.overdue} />
           <Metric icon={<CheckCircle2 />} label="Entregas" value={metrics.deliveries} />
         </section>
@@ -665,7 +679,7 @@ function Dashboard({
             <input
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar tarefa, projeto, observacao ou responsavel"
+              placeholder="Buscar tarefa, projeto, observação ou responsável"
             />
           </div>
           <div className="view-toggle" aria-label="Alternar visualizacao">
@@ -695,8 +709,8 @@ function Dashboard({
             <option value="todos">Todos os status</option>
             <option value="planejada">Planejada</option>
             <option value="em-andamento">Em andamento</option>
-            <option value="revisao">Revisao</option>
-            <option value="concluida">Concluida</option>
+            <option value="revisao">Revisão</option>
+            <option value="concluida">Concluída</option>
           </select>
           <select
             aria-label="Filtro de tipo"
@@ -705,7 +719,7 @@ function Dashboard({
           >
             <option value="todos">Todos os tipos</option>
             <option value="tarefa">Tarefa</option>
-            <option value="reuniao">Reuniao</option>
+            <option value="reuniao">Reunião</option>
             <option value="entrega">Entrega</option>
           </select>
           {currentUser.role === "gestor" ? (
@@ -714,7 +728,7 @@ function Dashboard({
               value={ownerFilter}
               onChange={(event) => setOwnerFilter(event.target.value)}
             >
-              <option value="todos">Todos os responsaveis</option>
+              <option value="todos">Todos os responsáveis</option>
               {colaboradores.map((user) => (
                 <option key={user.id} value={user.id}>
                   {user.name}
@@ -732,6 +746,12 @@ function Dashboard({
             statusStats={statusStats}
             visibleItems={visibleItems}
           />
+        ) : activeNav === "usuarios" && currentUser.role === "gestor" ? (
+          <UsersAdminPage
+            users={allUsers}
+            currentUser={currentUser}
+            onRefreshUsers={onRefreshUsers}
+          />
         ) : (
           <section className="main-grid">
             <div className="agenda-panel" id={viewMode}>
@@ -739,7 +759,7 @@ function Dashboard({
                 <div>
                   <p className="eyebrow">{viewMode === "agenda" ? "Agenda" : "Kanban"}</p>
                   <h3>
-                    {viewMode === "agenda" ? "Proximos compromissos" : "Fluxo de trabalho"}
+                    {viewMode === "agenda" ? "Próximos compromissos" : "Fluxo de trabalho"}
                   </h3>
                 </div>
                 <span className="save-hint">Salvo no banco de dados</span>
@@ -779,7 +799,7 @@ function Dashboard({
                   <p className="eyebrow">Gestor</p>
                   <h3>Demandas</h3>
                   <p className="muted-text">
-                    Crie tarefas, reunioes e entregas pelo botao principal.
+                    Crie tarefas, reuniões e entregas pelo botão principal.
                   </p>
                   <button className="primary-button" onClick={startNewDemand}>
                     <Plus size={18} />
@@ -791,7 +811,7 @@ function Dashboard({
                   <p className="eyebrow">Colaborador</p>
                   <h3>Minha fila</h3>
                   <p>
-                    Acompanhe suas tarefas, reunioes e entregas. Atualize o status quando avancar
+                    Acompanhe suas tarefas, reuniões e entregas. Atualize o status quando avançar
                     para manter o gestor alinhado.
                   </p>
                 </div>
@@ -799,13 +819,13 @@ function Dashboard({
 
               <div className="team-panel">
                 <p className="eyebrow">Alertas</p>
-                <h3>Proximos prazos</h3>
+                <h3>Próximos prazos</h3>
                 {nextDue.length ? (
                   nextDue.map((item) => (
                     <div className="alert-row" key={item.id}>
                       <span>{item.title}</span>
                       <small>
-                        {formatDate(item.date)} as {item.time}
+                        {formatDate(item.date)} às {item.time}
                       </small>
                     </div>
                   ))
@@ -841,7 +861,7 @@ function Dashboard({
             >
               <div className="drawer-header">
                 <div>
-                  <p className="eyebrow">{editingId ? "Edicao" : "Nova demanda"}</p>
+                  <p className="eyebrow">{editingId ? "Edição" : "Nova demanda"}</p>
                   <h3>{editingId ? "Editar demanda" : "Planejar atividade"}</h3>
                 </div>
                 <button
@@ -854,7 +874,7 @@ function Dashboard({
                 </button>
               </div>
               <label>
-                Titulo
+                Título
                 <input
                   required
                   value={form.title}
@@ -863,7 +883,7 @@ function Dashboard({
                 />
               </label>
               <label>
-                Responsavel
+                Responsável
                 <select
                   value={form.ownerId}
                   onChange={(event) => setForm({ ...form, ownerId: event.target.value })}
@@ -890,7 +910,7 @@ function Dashboard({
                     }
                   >
                     <option value="tarefa">Tarefa</option>
-                    <option value="reuniao">Reuniao</option>
+                    <option value="reuniao">Reunião</option>
                     <option value="entrega">Entrega</option>
                   </select>
                 </label>
@@ -902,9 +922,9 @@ function Dashboard({
                       setForm({ ...form, priority: event.target.value as WorkItem["priority"] })
                     }
                   >
-                    <option>Baixa</option>
-                    <option>Media</option>
-                    <option>Alta</option>
+                    <option value="Baixa">Baixa</option>
+                    <option value="Media">Média</option>
+                    <option value="Alta">Alta</option>
                   </select>
                 </label>
               </div>
@@ -919,8 +939,8 @@ function Dashboard({
                   >
                     <option value="planejada">Planejada</option>
                     <option value="em-andamento">Em andamento</option>
-                    <option value="revisao">Revisao</option>
-                    <option value="concluida">Concluida</option>
+                    <option value="revisao">Revisão</option>
+                    <option value="concluida">Concluída</option>
                   </select>
                 </label>
               ) : null}
@@ -953,7 +973,7 @@ function Dashboard({
                 />
               </label>
               <label>
-                Observacoes
+                Observações
                 <textarea
                   value={form.notes}
                   onChange={(event) => setForm({ ...form, notes: event.target.value })}
@@ -963,7 +983,7 @@ function Dashboard({
               <div className="form-actions">
                 <button className="primary-button" type="submit" disabled={saving}>
                   <Save size={18} />
-                  {saving ? "Salvando..." : editingId ? "Salvar alteracoes" : "Criar demanda"}
+                  {saving ? "Salvando..." : editingId ? "Salvar alterações" : "Criar demanda"}
                 </button>
                 <button className="ghost-button" type="button" onClick={resetForm}>
                   Cancelar
@@ -1025,7 +1045,7 @@ function TeamPage({
                 <div className="person-stats">
                   <span>{total} total</span>
                   <span>{pending} pendentes</span>
-                  <span>{done} concluidas</span>
+                  <span>{done} concluídas</span>
                   <span className={overdue ? "danger-text" : ""}>{overdue} atrasadas</span>
                 </div>
                 <div className="mini-list">
@@ -1034,12 +1054,12 @@ function TeamPage({
                       <div key={item.id}>
                         <strong>{item.title}</strong>
                         <small>
-                          {formatDate(item.date)} as {item.time}
+                          {formatDate(item.date)} às {item.time}
                         </small>
                       </div>
                     ))
                   ) : (
-                    <p className="muted-text">Sem pendencias no momento.</p>
+                    <p className="muted-text">Sem pendências no momento.</p>
                   )}
                 </div>
               </article>
@@ -1076,7 +1096,7 @@ function IndicatorsPage({
           <p className="eyebrow">Indicadores</p>
           <h3>Resumo operacional</h3>
         </div>
-        <span className="save-hint">{completionRate}% concluidas</span>
+        <span className="save-hint">{completionRate}% concluídas</span>
       </div>
       <div className="insights-grid">
         {statusStats.map(({ status, total }) => (
@@ -1096,12 +1116,12 @@ function IndicatorsPage({
         <article>
           <p className="eyebrow">Risco</p>
           <h4>{metrics.overdue} demandas atrasadas</h4>
-          <p className="muted-text">Use esse numero para priorizar renegociacoes de prazo.</p>
+          <p className="muted-text">Use esse número para priorizar renegociações de prazo.</p>
         </article>
         <article>
           <p className="eyebrow">Fila ativa</p>
           <h4>{metrics.pending} demandas pendentes</h4>
-          <p className="muted-text">Inclui tarefas planejadas, em andamento e em revisao.</p>
+          <p className="muted-text">Inclui tarefas planejadas, em andamento e em revisão.</p>
         </article>
         <article>
           <p className="eyebrow">Entregas</p>
@@ -1109,6 +1129,117 @@ function IndicatorsPage({
           <p className="muted-text">Mostra apenas o que aparece nos filtros atuais.</p>
         </article>
       </div>
+    </section>
+  );
+}
+
+// ─── Página Usuários (admin) ──────────────────────────────────
+
+function UsersAdminPage({
+  users,
+  currentUser,
+  onRefreshUsers,
+}: {
+  users: User[];
+  currentUser: User;
+  onRefreshUsers: () => Promise<void>;
+}) {
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [teamDraft, setTeamDraft] = useState<Record<string, string>>({});
+  const [error, setError] = useState("");
+
+  const sorted = [...users].sort((a, b) => a.name.localeCompare(b.name));
+
+  async function changeRole(user: User, role: Role) {
+    setError("");
+    setBusyId(user.id);
+    const { error: err } = await supabase
+      .from("profiles")
+      .update({ role })
+      .eq("id", user.id);
+    if (err) setError("Não foi possível alterar o papel: " + err.message);
+    await onRefreshUsers();
+    setBusyId(null);
+  }
+
+  async function saveTeam(user: User) {
+    const next = (teamDraft[user.id] ?? user.team).trim();
+    if (next === user.team) return;
+    setError("");
+    setBusyId(user.id);
+    const { error: err } = await supabase
+      .from("profiles")
+      .update({ team: next })
+      .eq("id", user.id);
+    if (err) setError("Não foi possível alterar a equipe: " + err.message);
+    await onRefreshUsers();
+    setBusyId(null);
+  }
+
+  return (
+    <section className="management-panel" id="usuarios">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Usuários</p>
+          <h3>Gestão de acessos da equipe</h3>
+        </div>
+        <span className="save-hint">{users.length} cadastrados</span>
+      </div>
+
+      {error ? <p className="form-error">{error}</p> : null}
+
+      {sorted.length === 0 ? (
+        <div className="empty-state">
+          <strong>Nenhum usuário cadastrado</strong>
+          <p>Os usuários aparecem aqui assim que criam uma conta.</p>
+        </div>
+      ) : (
+        <div className="users-table">
+          {sorted.map((user) => {
+            const isSelf = user.id === currentUser.id;
+            const busy = busyId === user.id;
+            return (
+              <article className="user-row-card" key={user.id}>
+                <div className="user-row-main">
+                  <div className="user-avatar">
+                    <UserRound size={20} />
+                  </div>
+                  <div>
+                    <strong>{user.name}</strong>
+                    <small>{user.email}</small>
+                  </div>
+                </div>
+                <div className="user-row-controls">
+                  <label className="inline-field">
+                    Equipe
+                    <input
+                      value={teamDraft[user.id] ?? user.team}
+                      onChange={(e) =>
+                        setTeamDraft({ ...teamDraft, [user.id]: e.target.value })
+                      }
+                      onBlur={() => saveTeam(user)}
+                      placeholder="Sem equipe"
+                      disabled={busy}
+                    />
+                  </label>
+                  <label className="inline-field">
+                    Papel
+                    <select
+                      value={user.role}
+                      disabled={busy || isSelf}
+                      onChange={(e) => changeRole(user, e.target.value as Role)}
+                      title={isSelf ? "Você não pode alterar o próprio papel" : undefined}
+                    >
+                      <option value="colaborador">Colaborador</option>
+                      <option value="gestor">Gestor</option>
+                    </select>
+                  </label>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      )}
     </section>
   );
 }
@@ -1166,10 +1297,10 @@ function CalendarView({
 
   return (
     <div className="calendar-layout">
-      <div className="calendar-panel" aria-label="Calendario mensal">
+      <div className="calendar-panel" aria-label="Calendário mensal">
         <div className="calendar-toolbar">
           <div>
-            <span>Calendario mensal</span>
+            <span>Calendário mensal</span>
             <strong>{monthLabel}</strong>
           </div>
           <button className="ghost-button" onClick={() => onSelectDate(today)}>
@@ -1177,7 +1308,7 @@ function CalendarView({
           </button>
         </div>
         <div className="calendar-weekdays">
-          {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sab"].map((day) => (
+          {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((day) => (
             <span key={day}>{day}</span>
           ))}
         </div>
@@ -1339,9 +1470,9 @@ function WorkCard({
           <span>{owner?.name ?? "—"}</span>
           <span>{item.project || "Sem projeto"}</span>
           <span>
-            {formatDate(item.date)} as {item.time}
+            {formatDate(item.date)} às {item.time}
           </span>
-          <span>Prioridade {item.priority}</span>
+          <span>Prioridade {priorityLabel[item.priority]}</span>
         </div>
         <div className="card-actions">
           {canEditStatus ? (
@@ -1352,8 +1483,8 @@ function WorkCard({
             >
               <option value="planejada">Planejada</option>
               <option value="em-andamento">Em andamento</option>
-              <option value="revisao">Revisao</option>
-              <option value="concluida">Concluida</option>
+              <option value="revisao">Revisão</option>
+              <option value="concluida">Concluída</option>
             </select>
           ) : null}
           {canManage ? (
