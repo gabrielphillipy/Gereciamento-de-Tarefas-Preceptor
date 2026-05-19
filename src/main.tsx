@@ -328,6 +328,7 @@ function Dashboard({
   const [ownerFilter, setOwnerFilter] = useState("todos");
   const [kindFilter, setKindFilter] = useState<Kind | "todos">("todos");
   const [editingId, setEditingId] = useState<number | null>(null);
+  const [composerOpen, setComposerOpen] = useState(false);
   const [form, setForm] = useState<WorkForm>(emptyForm);
 
   const visibleItems = useMemo(() => {
@@ -384,6 +385,7 @@ function Dashboard({
   function resetForm() {
     setForm(emptyForm);
     setEditingId(null);
+    setComposerOpen(false);
   }
 
   function saveItem(event: React.FormEvent) {
@@ -430,6 +432,7 @@ function Dashboard({
 
   function editItem(item: WorkItem) {
     setEditingId(item.id);
+    setComposerOpen(true);
     setForm({
       title: item.title,
       ownerId: item.ownerId,
@@ -467,6 +470,12 @@ function Dashboard({
     }
   }
 
+  function startNewDemand() {
+    setEditingId(null);
+    setForm(emptyForm);
+    setComposerOpen(true);
+  }
+
   return (
     <main className="app-shell">
       <aside className="sidebar">
@@ -502,9 +511,18 @@ function Dashboard({
         <header className="topbar">
           <div>
             <p className="eyebrow">Painel {currentUser.role}</p>
-            <h2>Rotina de trabalho da equipe</h2>
+            <h2>Central de operacao</h2>
+            <p className="topbar-subtitle">
+              Priorize demandas, acompanhe prazos e mantenha a equipe alinhada.
+            </p>
           </div>
           <div className="topbar-actions">
+            {currentUser.role === "gestor" ? (
+              <button className="primary-button" onClick={startNewDemand}>
+                <Plus size={18} />
+                Nova demanda
+              </button>
+            ) : null}
             <button className="ghost-button icon-button" onClick={restoreSampleData} title="Restaurar dados">
               <RotateCcw size={18} />
             </button>
@@ -637,134 +655,19 @@ function Dashboard({
 
           <div className="side-panel">
             {currentUser.role === "gestor" ? (
-              <form className="create-form" onSubmit={saveItem}>
-                <div className="section-heading compact">
-                  <div>
-                    <p className="eyebrow">{editingId ? "Edicao" : "Gestor"}</p>
-                    <h3>{editingId ? "Editar demanda" : "Demandar atividade"}</h3>
-                  </div>
-                  {editingId ? <Save size={20} /> : <Plus size={20} />}
-                </div>
-                <label>
-                  Titulo
-                  <input
-                    required
-                    value={form.title}
-                    onChange={(event) => setForm({ ...form, title: event.target.value })}
-                    placeholder="Nome da tarefa"
-                  />
-                </label>
-                <label>
-                  Responsavel
-                  <select
-                    value={form.ownerId}
-                    onChange={(event) => setForm({ ...form, ownerId: event.target.value })}
-                  >
-                    {users
-                      .filter((user) => user.role === "colaborador")
-                      .map((user) => (
-                        <option key={user.id} value={user.id}>
-                          {user.name} - {user.team}
-                        </option>
-                      ))}
-                  </select>
-                </label>
-                <div className="form-pair">
-                  <label>
-                    Tipo
-                    <select
-                      value={form.kind}
-                      onChange={(event) =>
-                        setForm({ ...form, kind: event.target.value as Kind })
-                      }
-                    >
-                      <option value="tarefa">Tarefa</option>
-                      <option value="reuniao">Reuniao</option>
-                      <option value="entrega">Entrega</option>
-                    </select>
-                  </label>
-                  <label>
-                    Prioridade
-                    <select
-                      value={form.priority}
-                      onChange={(event) =>
-                        setForm({
-                          ...form,
-                          priority: event.target.value as WorkItem["priority"],
-                        })
-                      }
-                    >
-                      <option>Baixa</option>
-                      <option>Media</option>
-                      <option>Alta</option>
-                    </select>
-                  </label>
-                </div>
-                {editingId ? (
-                  <label>
-                    Status
-                    <select
-                      value={form.status}
-                      onChange={(event) =>
-                        setForm({ ...form, status: event.target.value as Status })
-                      }
-                    >
-                      <option value="planejada">Planejada</option>
-                      <option value="em-andamento">Em andamento</option>
-                      <option value="revisao">Revisao</option>
-                      <option value="concluida">Concluida</option>
-                    </select>
-                  </label>
-                ) : null}
-                <div className="form-pair">
-                  <label>
-                    Data
-                    <input
-                      required
-                      type="date"
-                      value={form.date}
-                      onChange={(event) => setForm({ ...form, date: event.target.value })}
-                    />
-                  </label>
-                  <label>
-                    Hora
-                    <input
-                      required
-                      type="time"
-                      value={form.time}
-                      onChange={(event) => setForm({ ...form, time: event.target.value })}
-                    />
-                  </label>
-                </div>
-                <label>
-                  Projeto
-                  <input
-                    value={form.project}
-                    onChange={(event) => setForm({ ...form, project: event.target.value })}
-                    placeholder="Ex: Campanha institucional"
-                  />
-                </label>
-                <label>
-                  Observacoes
-                  <textarea
-                    value={form.notes}
-                    onChange={(event) => setForm({ ...form, notes: event.target.value })}
-                    placeholder="Contexto, briefing ou link"
-                  />
-                </label>
-                <div className="form-actions">
-                  <button className="primary-button" type="submit">
-                    {editingId ? "Salvar alteracoes" : "Criar demanda"}
-                  </button>
-                  {editingId ? (
-                    <button className="ghost-button" type="button" onClick={resetForm}>
-                      Cancelar
-                    </button>
-                  ) : null}
-                </div>
-              </form>
+              <div className="team-panel action-panel">
+                <p className="eyebrow">Gestor</p>
+                <h3>Demandas</h3>
+                <p className="muted-text">
+                  Crie tarefas, reunioes e entregas pelo botao principal. Edicoes abrem no mesmo painel.
+                </p>
+                <button className="primary-button" onClick={startNewDemand}>
+                  <Plus size={18} />
+                  Criar demanda
+                </button>
+              </div>
             ) : (
-              <div className="create-form collaborator-note">
+              <div className="team-panel collaborator-note">
                 <p className="eyebrow">Colaborador</p>
                 <h3>Minha fila</h3>
                 <p>
@@ -804,6 +707,130 @@ function Dashboard({
           </div>
         </section>
         )}
+        {composerOpen && currentUser.role === "gestor" ? (
+          <div className="drawer-backdrop" role="presentation">
+            <form className="task-drawer" onSubmit={saveItem} aria-label="Formulario de demanda">
+              <div className="drawer-header">
+                <div>
+                  <p className="eyebrow">{editingId ? "Edicao" : "Nova demanda"}</p>
+                  <h3>{editingId ? "Editar demanda" : "Planejar atividade"}</h3>
+                </div>
+                <button className="ghost-button icon-button" type="button" onClick={resetForm} title="Fechar">
+                  x
+                </button>
+              </div>
+              <label>
+                Titulo
+                <input
+                  required
+                  value={form.title}
+                  onChange={(event) => setForm({ ...form, title: event.target.value })}
+                  placeholder="Nome da tarefa"
+                />
+              </label>
+              <label>
+                Responsavel
+                <select
+                  value={form.ownerId}
+                  onChange={(event) => setForm({ ...form, ownerId: event.target.value })}
+                >
+                  {users
+                    .filter((user) => user.role === "colaborador")
+                    .map((user) => (
+                      <option key={user.id} value={user.id}>
+                        {user.name} - {user.team}
+                      </option>
+                    ))}
+                </select>
+              </label>
+              <div className="form-pair">
+                <label>
+                  Tipo
+                  <select
+                    value={form.kind}
+                    onChange={(event) => setForm({ ...form, kind: event.target.value as Kind })}
+                  >
+                    <option value="tarefa">Tarefa</option>
+                    <option value="reuniao">Reuniao</option>
+                    <option value="entrega">Entrega</option>
+                  </select>
+                </label>
+                <label>
+                  Prioridade
+                  <select
+                    value={form.priority}
+                    onChange={(event) =>
+                      setForm({ ...form, priority: event.target.value as WorkItem["priority"] })
+                    }
+                  >
+                    <option>Baixa</option>
+                    <option>Media</option>
+                    <option>Alta</option>
+                  </select>
+                </label>
+              </div>
+              {editingId ? (
+                <label>
+                  Status
+                  <select
+                    value={form.status}
+                    onChange={(event) => setForm({ ...form, status: event.target.value as Status })}
+                  >
+                    <option value="planejada">Planejada</option>
+                    <option value="em-andamento">Em andamento</option>
+                    <option value="revisao">Revisao</option>
+                    <option value="concluida">Concluida</option>
+                  </select>
+                </label>
+              ) : null}
+              <div className="form-pair">
+                <label>
+                  Data
+                  <input
+                    required
+                    type="date"
+                    value={form.date}
+                    onChange={(event) => setForm({ ...form, date: event.target.value })}
+                  />
+                </label>
+                <label>
+                  Hora
+                  <input
+                    required
+                    type="time"
+                    value={form.time}
+                    onChange={(event) => setForm({ ...form, time: event.target.value })}
+                  />
+                </label>
+              </div>
+              <label>
+                Projeto
+                <input
+                  value={form.project}
+                  onChange={(event) => setForm({ ...form, project: event.target.value })}
+                  placeholder="Ex: Campanha institucional"
+                />
+              </label>
+              <label>
+                Observacoes
+                <textarea
+                  value={form.notes}
+                  onChange={(event) => setForm({ ...form, notes: event.target.value })}
+                  placeholder="Contexto, briefing ou link"
+                />
+              </label>
+              <div className="form-actions">
+                <button className="primary-button" type="submit">
+                  <Save size={18} />
+                  {editingId ? "Salvar alteracoes" : "Criar demanda"}
+                </button>
+                <button className="ghost-button" type="button" onClick={resetForm}>
+                  Cancelar
+                </button>
+              </div>
+            </form>
+          </div>
+        ) : null}
       </section>
     </main>
   );

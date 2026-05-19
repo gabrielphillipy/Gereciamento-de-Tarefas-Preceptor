@@ -5,7 +5,7 @@ test.beforeEach(async ({ page }) => {
   await page.evaluate(() => window.localStorage.clear());
   await page.reload();
   await page.getByRole("button", { name: "Entrar" }).click();
-  await expect(page.getByText("Rotina de trabalho da equipe")).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Central de operacao" })).toBeVisible();
 });
 
 test("filtro de responsavel atualiza a tela de equipe", async ({ page }) => {
