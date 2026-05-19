@@ -18,6 +18,7 @@ import {
   Trash2,
   UserRound,
   UsersRound,
+  X,
 } from "lucide-react";
 import "./styles.css";
 
@@ -257,6 +258,9 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
         </div>
         <p className="eyebrow">Preceptor Tasks</p>
         <h1>Gestao de tarefas, agenda e entregas da equipe</h1>
+        <p className="login-copy">
+          Uma central para organizar demandas, compromissos e entregas sem perder o controle dos prazos.
+        </p>
         <form className="login-form" onSubmit={submit}>
           <label>
             Usuario
@@ -304,6 +308,11 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
             <strong>Operacao</strong>
             <p>Criar, editar, excluir e filtrar demandas sem backend por enquanto.</p>
           </div>
+        </div>
+        <div className="preview-metrics">
+          <span>4 status de fluxo</span>
+          <span>3 areas de equipe</span>
+          <span>100% local</span>
         </div>
       </section>
     </main>
@@ -480,8 +489,13 @@ function Dashboard({
     <main className="app-shell">
       <aside className="sidebar">
         <div className="side-brand">
-          <ShieldCheck />
-          <span>Preceptor</span>
+          <div className="brand-icon">
+            <ShieldCheck size={22} />
+          </div>
+          <div>
+            <span>Preceptor</span>
+            <small>Operations Hub</small>
+          </div>
         </div>
         <nav>
           <button className={activeNav === "agenda" ? "active" : ""} onClick={() => navigate("agenda")}>
@@ -716,7 +730,7 @@ function Dashboard({
                   <h3>{editingId ? "Editar demanda" : "Planejar atividade"}</h3>
                 </div>
                 <button className="ghost-button icon-button" type="button" onClick={resetForm} title="Fechar">
-                  x
+                  <X size={18} />
                 </button>
               </div>
               <label>
