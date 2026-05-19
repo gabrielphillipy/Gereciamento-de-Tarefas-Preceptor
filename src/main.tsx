@@ -354,6 +354,22 @@ function Dashboard({
   };
 
   const nextDue = visibleItems.filter((item) => item.status !== "concluida").slice(0, 3);
+  const teamStats = users
+    .filter((user) => user.role === "colaborador")
+    .map((user) => {
+      const assigned = items.filter((item) => item.ownerId === user.id);
+      return {
+        user,
+        total: assigned.length,
+        pending: assigned.filter((item) => item.status !== "concluida").length,
+        overdue: assigned.filter((item) => isOverdue(item)).length,
+        done: assigned.filter((item) => item.status === "concluida").length,
+      };
+    });
+  const statusStats = (Object.keys(statusLabel) as Status[]).map((status) => ({
+    status,
+    total: visibleItems.filter((item) => item.status === status).length,
+  }));
 
   function resetForm() {
     setForm(emptyForm);
@@ -439,10 +455,6 @@ function Dashboard({
     if (section === "agenda" || section === "kanban") {
       setViewMode(section);
     }
-
-    window.requestAnimationFrame(() => {
-      document.getElementById(section)?.scrollIntoView({ behavior: "smooth", block: "start" });
-    });
   }
 
   return (
@@ -493,7 +505,7 @@ function Dashboard({
           </div>
         </header>
 
-        <section className="metrics" id="indicadores">
+        <section className="metrics">
           <Metric icon={<CalendarDays />} label="Eventos" value={metrics.total} />
           <Metric icon={<Clock3 />} label="Pendencias" value={metrics.pending} />
           <Metric icon={<Megaphone />} label="Atrasadas" value={metrics.overdue} />
@@ -555,6 +567,11 @@ function Dashboard({
           ) : null}
         </section>
 
+        {activeNav === "equipe" ? (
+          <TeamPage stats={teamStats} items={items} />
+        ) : activeNav === "indicadores" ? (
+          <IndicatorsPage metrics={metrics} statusStats={statusStats} visibleItems={visibleItems} />
+        ) : (
         <section className="main-grid">
           <div className="agenda-panel" id={viewMode}>
             <div className="section-heading">
@@ -764,8 +781,137 @@ function Dashboard({
             </div>
           </div>
         </section>
+        )}
       </section>
     </main>
+  );
+}
+
+function TeamPage({
+  stats,
+  items,
+}: {
+  stats: Array<{
+    user: User;
+    total: number;
+    pending: number;
+    overdue: number;
+    done: number;
+  }>;
+  items: WorkItem[];
+}) {
+  return (
+    <section className="management-panel" id="equipe">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Equipe</p>
+          <h3>Capacidade e responsabilidades</h3>
+        </div>
+      </div>
+      <div className="team-grid">
+        {stats.map(({ user, total, pending, overdue, done }) => {
+          const assigned = items
+            .filter((item) => item.ownerId === user.id && item.status !== "concluida")
+            .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))
+            .slice(0, 3);
+
+          return (
+            <article className="person-card" key={user.id}>
+              <div className="person-header">
+                <div>
+                  <strong>{user.name}</strong>
+                  <span>{user.team}</span>
+                </div>
+                <UserRound size={22} />
+              </div>
+              <div className="person-stats">
+                <span>{total} total</span>
+                <span>{pending} pendentes</span>
+                <span>{done} concluidas</span>
+                <span className={overdue ? "danger-text" : ""}>{overdue} atrasadas</span>
+              </div>
+              <div className="mini-list">
+                {assigned.length ? (
+                  assigned.map((item) => (
+                    <div key={item.id}>
+                      <strong>{item.title}</strong>
+                      <small>{formatDate(item.date)} as {item.time}</small>
+                    </div>
+                  ))
+                ) : (
+                  <p className="muted-text">Sem pendencias no momento.</p>
+                )}
+              </div>
+            </article>
+          );
+        })}
+      </div>
+    </section>
+  );
+}
+
+function IndicatorsPage({
+  metrics,
+  statusStats,
+  visibleItems,
+}: {
+  metrics: {
+    total: number;
+    pending: number;
+    overdue: number;
+    deliveries: number;
+  };
+  statusStats: Array<{ status: Status; total: number }>;
+  visibleItems: WorkItem[];
+}) {
+  const completionRate =
+    metrics.total === 0
+      ? 0
+      : Math.round(
+          (visibleItems.filter((item) => item.status === "concluida").length / metrics.total) * 100
+        );
+
+  return (
+    <section className="management-panel" id="indicadores">
+      <div className="section-heading">
+        <div>
+          <p className="eyebrow">Indicadores</p>
+          <h3>Resumo operacional</h3>
+        </div>
+        <span className="save-hint">{completionRate}% concluidas</span>
+      </div>
+      <div className="insights-grid">
+        {statusStats.map(({ status, total }) => (
+          <article className="insight-card" key={status}>
+            <span>{statusLabel[status]}</span>
+            <strong>{total}</strong>
+            <div className="progress-track">
+              <div
+                className="progress-fill"
+                style={{ width: `${metrics.total ? (total / metrics.total) * 100 : 0}%` }}
+              />
+            </div>
+          </article>
+        ))}
+      </div>
+      <div className="report-grid">
+        <article>
+          <p className="eyebrow">Risco</p>
+          <h4>{metrics.overdue} demandas atrasadas</h4>
+          <p className="muted-text">Use esse numero para priorizar renegociacoes de prazo.</p>
+        </article>
+        <article>
+          <p className="eyebrow">Fila ativa</p>
+          <h4>{metrics.pending} demandas pendentes</h4>
+          <p className="muted-text">Inclui tarefas planejadas, em andamento e em revisao.</p>
+        </article>
+        <article>
+          <p className="eyebrow">Entregas</p>
+          <h4>{metrics.deliveries} entregas filtradas</h4>
+          <p className="muted-text">Mostra apenas o que aparece nos filtros atuais.</p>
+        </article>
+      </div>
+    </section>
   );
 }
 
