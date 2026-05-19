@@ -62,7 +62,7 @@ const users: User[] = [
   {
     id: "ana",
     name: "Ana Martins",
-    email: "gestor@empresa.com",
+    email: "ana@preceptor.com.br",
     password: "gestor123",
     role: "gestor",
     team: "Lideranca",
@@ -70,7 +70,7 @@ const users: User[] = [
   {
     id: "bruno",
     name: "Bruno Silva",
-    email: "colaborador@empresa.com",
+    email: "bruno@preceptor.com.br",
     password: "colab123",
     role: "colaborador",
     team: "Conteudo",
@@ -78,7 +78,7 @@ const users: User[] = [
   {
     id: "carla",
     name: "Carla Souza",
-    email: "carla@empresa.com",
+    email: "carla@preceptor.com.br",
     password: "colab123",
     role: "colaborador",
     team: "Performance",
@@ -86,7 +86,7 @@ const users: User[] = [
   {
     id: "diego",
     name: "Diego Lima",
-    email: "diego@empresa.com",
+    email: "diego@preceptor.com.br",
     password: "colab123",
     role: "colaborador",
     team: "Criacao",
@@ -230,8 +230,8 @@ function App() {
 }
 
 function Login({ onLogin }: { onLogin: (user: User) => void }) {
-  const [email, setEmail] = useState("gestor@empresa.com");
-  const [password, setPassword] = useState("gestor123");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
   const [error, setError] = useState("");
 
   function submit(event: React.FormEvent) {
@@ -241,7 +241,7 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
     );
 
     if (!found) {
-      setError("Usuario ou senha invalido. Teste gestor@empresa.com / gestor123.");
+      setError("Usuario ou senha invalido. Verifique suas credenciais.");
       return;
     }
 
@@ -266,7 +266,7 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
             <input
               value={email}
               onChange={(event) => setEmail(event.target.value)}
-              placeholder="email da empresa"
+              placeholder="seu@preceptor.com.br"
               type="email"
             />
           </label>
@@ -284,10 +284,6 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
             Entrar
           </button>
         </form>
-        <div className="access-grid" aria-label="Acessos de teste">
-          <span>Gestor: gestor@empresa.com / gestor123</span>
-          <span>Colaborador: colaborador@empresa.com / colab123</span>
-        </div>
       </section>
       <section className="login-preview">
         <div className="preview-topline">
@@ -305,13 +301,13 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
           </div>
           <div>
             <strong>Operacao</strong>
-            <p>Criar, editar, excluir e filtrar demandas sem backend por enquanto.</p>
+            <p>Criar, editar, excluir e filtrar demandas com dados salvos no navegador.</p>
           </div>
         </div>
         <div className="preview-metrics">
           <span>4 status de fluxo</span>
           <span>3 areas de equipe</span>
-          <span>100% local</span>
+          <span>Preceptor</span>
         </div>
       </section>
     </main>
