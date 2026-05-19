@@ -1,4 +1,4 @@
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
   BarChart3,
@@ -10,7 +10,6 @@ import {
   LogOut,
   Megaphone,
   Plus,
-  RotateCcw,
   Save,
   Search,
   Sparkles,
@@ -19,7 +18,10 @@ import {
   UsersRound,
   X,
 } from "lucide-react";
+import { supabase } from "./supabase";
 import "./styles.css";
+
+// ─── Tipos ───────────────────────────────────────────────────
 
 type Role = "gestor" | "colaborador";
 type Status = "planejada" | "em-andamento" | "revisao" | "concluida";
@@ -32,7 +34,6 @@ type User = {
   name: string;
   email: string;
   role: Role;
-  password: string;
   team: string;
 };
 
@@ -55,105 +56,9 @@ type WorkForm = Omit<WorkItem, "id" | "status" | "createdAt" | "updatedAt"> & {
   status?: Status;
 };
 
-const STORAGE_ITEMS_KEY = "preceptor.workItems";
-const STORAGE_USER_KEY = "preceptor.currentUser";
-
-const users: User[] = [
-  {
-    id: "ana",
-    name: "Ana Martins",
-    email: "ana@preceptor.com.br",
-    password: "gestor123",
-    role: "gestor",
-    team: "Lideranca",
-  },
-  {
-    id: "bruno",
-    name: "Bruno Silva",
-    email: "bruno@preceptor.com.br",
-    password: "colab123",
-    role: "colaborador",
-    team: "Conteudo",
-  },
-  {
-    id: "carla",
-    name: "Carla Souza",
-    email: "carla@preceptor.com.br",
-    password: "colab123",
-    role: "colaborador",
-    team: "Performance",
-  },
-  {
-    id: "diego",
-    name: "Diego Lima",
-    email: "diego@preceptor.com.br",
-    password: "colab123",
-    role: "colaborador",
-    team: "Criacao",
-  },
-];
+// ─── Constantes ──────────────────────────────────────────────
 
 const today = new Date().toISOString().slice(0, 10);
-const now = new Date().toISOString();
-
-const initialItems: WorkItem[] = [
-  {
-    id: 1,
-    title: "Ajustar calendario editorial do mes",
-    ownerId: "bruno",
-    kind: "tarefa",
-    status: "em-andamento",
-    date: "2026-05-20",
-    time: "09:00",
-    priority: "Alta",
-    project: "Campanha Maio",
-    notes: "Revisar temas, responsaveis e ordem das publicacoes.",
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: 2,
-    title: "Reuniao de alinhamento com equipe",
-    ownerId: "carla",
-    kind: "reuniao",
-    status: "planejada",
-    date: "2026-05-21",
-    time: "14:30",
-    priority: "Media",
-    project: "Rotina semanal",
-    notes: "Pauta: metas, gargalos e proximas entregas.",
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: 3,
-    title: "Entrega do relatorio de desempenho",
-    ownerId: "carla",
-    kind: "entrega",
-    status: "revisao",
-    date: "2026-05-23",
-    time: "17:00",
-    priority: "Alta",
-    project: "Performance",
-    notes: "Incluir analise por canal e sugestoes de melhoria.",
-    createdAt: now,
-    updatedAt: now,
-  },
-  {
-    id: 4,
-    title: "Criar pecas para comunicacao interna",
-    ownerId: "diego",
-    kind: "tarefa",
-    status: "planejada",
-    date: "2026-05-24",
-    time: "10:00",
-    priority: "Media",
-    project: "Endomarketing",
-    notes: "Priorizar banners de aviso e card para intranet.",
-    createdAt: now,
-    updatedAt: now,
-  },
-];
 
 const statusLabel: Record<Status, string> = {
   planejada: "Planejada",
@@ -168,85 +73,206 @@ const kindLabel: Record<Kind, string> = {
   entrega: "Entrega",
 };
 
-const emptyForm: WorkForm = {
-  title: "",
-  ownerId: "bruno",
-  kind: "tarefa",
-  date: "2026-05-25",
-  time: "09:00",
-  priority: "Media",
-  project: "",
-  notes: "",
-};
+// ─── Helpers de mapeamento DB → TS ───────────────────────────
 
-function loadItems() {
-  const stored = localStorage.getItem(STORAGE_ITEMS_KEY);
-  if (!stored) return initialItems;
-
-  try {
-    const parsed = JSON.parse(stored) as WorkItem[];
-    return Array.isArray(parsed) ? parsed : initialItems;
-  } catch {
-    return initialItems;
-  }
+function mapItem(row: Record<string, unknown>): WorkItem {
+  return {
+    id: row.id as number,
+    title: row.title as string,
+    ownerId: row.owner_id as string,
+    kind: row.kind as Kind,
+    status: row.status as Status,
+    date: row.date as string,
+    time: row.time as string,
+    priority: row.priority as WorkItem["priority"],
+    project: (row.project as string) ?? "",
+    notes: (row.notes as string) ?? "",
+    createdAt: row.created_at as string,
+    updatedAt: row.updated_at as string,
+  };
 }
 
-function loadCurrentUser() {
-  const stored = localStorage.getItem(STORAGE_USER_KEY);
-  if (!stored) return null;
-  return users.find((user) => user.id === stored) ?? null;
+function mapUser(row: Record<string, unknown>): User {
+  return {
+    id: row.id as string,
+    name: row.name as string,
+    email: row.email as string,
+    role: row.role as Role,
+    team: (row.team as string) ?? "",
+  };
 }
+
+function makeEmptyForm(firstColabId = ""): WorkForm {
+  return {
+    title: "",
+    ownerId: firstColabId,
+    kind: "tarefa",
+    date: today,
+    time: "09:00",
+    priority: "Media",
+    project: "",
+    notes: "",
+  };
+}
+
+// ─── App ─────────────────────────────────────────────────────
 
 function App() {
-  const [currentUser, setCurrentUser] = useState<User | null>(() => loadCurrentUser());
-  const [items, setItems] = useState<WorkItem[]>(() => loadItems());
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+  const [allUsers, setAllUsers] = useState<User[]>([]);
+  const [items, setItems] = useState<WorkItem[]>([]);
+  const [loading, setLoading] = useState(true);
+
+  const fetchItems = useCallback(async () => {
+    const { data } = await supabase
+      .from("work_items")
+      .select("*")
+      .order("date")
+      .order("time");
+    if (data) setItems(data.map(mapItem));
+  }, []);
+
+  const loadUserAndData = useCallback(async (userId: string) => {
+    setLoading(true);
+    const [profileRes, usersRes, itemsRes] = await Promise.all([
+      supabase.from("profiles").select("*").eq("id", userId).single(),
+      supabase.from("profiles").select("*"),
+      supabase.from("work_items").select("*").order("date").order("time"),
+    ]);
+    if (profileRes.data) setCurrentUser(mapUser(profileRes.data));
+    if (usersRes.data) setAllUsers(usersRes.data.map(mapUser));
+    if (itemsRes.data) setItems(itemsRes.data.map(mapItem));
+    setLoading(false);
+  }, []);
 
   useEffect(() => {
-    localStorage.setItem(STORAGE_ITEMS_KEY, JSON.stringify(items));
-  }, [items]);
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        loadUserAndData(session.user.id);
+      } else {
+        setLoading(false);
+      }
+    });
 
-  function login(user: User) {
-    localStorage.setItem(STORAGE_USER_KEY, user.id);
-    setCurrentUser(user);
+    const {
+      data: { subscription },
+    } = supabase.auth.onAuthStateChange((event, session) => {
+      if (session && (event === "SIGNED_IN" || event === "TOKEN_REFRESHED")) {
+        loadUserAndData(session.user.id);
+      } else if (event === "SIGNED_OUT") {
+        setCurrentUser(null);
+        setAllUsers([]);
+        setItems([]);
+        setLoading(false);
+      }
+    });
+
+    return () => subscription.unsubscribe();
+  }, [loadUserAndData]);
+
+  async function logout() {
+    await supabase.auth.signOut();
   }
 
-  function logout() {
-    localStorage.removeItem(STORAGE_USER_KEY);
-    setCurrentUser(null);
+  if (loading) {
+    return (
+      <div className="loading-screen">
+        <div className="brand-mark">
+          <span>P!</span>
+        </div>
+        <p>Carregando...</p>
+      </div>
+    );
   }
 
   if (!currentUser) {
-    return <Login onLogin={login} />;
+    return <Login />;
   }
 
   return (
     <Dashboard
       currentUser={currentUser}
+      allUsers={allUsers}
       items={items}
-      setItems={setItems}
+      onRefresh={fetchItems}
       onLogout={logout}
     />
   );
 }
 
-function Login({ onLogin }: { onLogin: (user: User) => void }) {
+// ─── Login / Cadastro ─────────────────────────────────────────
+
+function Login() {
+  const [mode, setMode] = useState<"login" | "register">("login");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [name, setName] = useState("");
+  const [role, setRole] = useState<Role>("colaborador");
+  const [team, setTeam] = useState("");
   const [error, setError] = useState("");
+  const [info, setInfo] = useState("");
+  const [submitting, setSubmitting] = useState(false);
 
-  function submit(event: React.FormEvent) {
+  function switchMode(next: "login" | "register") {
+    setMode(next);
+    setError("");
+    setInfo("");
+  }
+
+  async function handleLogin(event: React.FormEvent) {
     event.preventDefault();
-    const found = users.find(
-      (user) => user.email === email.trim() && user.password === password
-    );
+    setError("");
+    setSubmitting(true);
+    const { error: authError } = await supabase.auth.signInWithPassword({
+      email: email.trim(),
+      password,
+    });
+    if (authError) setError("Email ou senha incorretos.");
+    setSubmitting(false);
+  }
 
-    if (!found) {
-      setError("Usuario ou senha invalido. Verifique suas credenciais.");
+  async function handleRegister(event: React.FormEvent) {
+    event.preventDefault();
+    setError("");
+    setSubmitting(true);
+
+    const { data: authData, error: authError } = await supabase.auth.signUp({
+      email: email.trim(),
+      password,
+    });
+
+    if (authError) {
+      setError(authError.message);
+      setSubmitting(false);
       return;
     }
 
-    setError("");
-    onLogin(found);
+    if (!authData.user) {
+      setError("Erro ao criar conta.");
+      setSubmitting(false);
+      return;
+    }
+
+    const { error: profileError } = await supabase.from("profiles").insert({
+      id: authData.user.id,
+      name: name.trim(),
+      email: email.trim(),
+      role,
+      team: team.trim(),
+    });
+
+    if (profileError) {
+      setError("Conta criada, mas erro ao salvar perfil: " + profileError.message);
+      setSubmitting(false);
+      return;
+    }
+
+    if (!authData.session) {
+      setInfo("Conta criada! Verifique seu email para confirmar e depois faca login.");
+      switchMode("login");
+    }
+
+    setSubmitting(false);
   }
 
   return (
@@ -257,34 +283,110 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
         </div>
         <p className="eyebrow">Preceptor Tasks</p>
         <h1>Gestao de tarefas, agenda e entregas da equipe</h1>
-        <p className="login-copy">
-          Uma central para organizar demandas, compromissos e entregas sem perder o controle dos prazos.
-        </p>
-        <form className="login-form" onSubmit={submit}>
-          <label>
-            Usuario
-            <input
-              value={email}
-              onChange={(event) => setEmail(event.target.value)}
-              placeholder="seu@preceptor.com.br"
-              type="email"
-            />
-          </label>
-          <label>
-            Senha
-            <input
-              value={password}
-              onChange={(event) => setPassword(event.target.value)}
-              placeholder="senha"
-              type="password"
-            />
-          </label>
-          {error ? <p className="form-error">{error}</p> : null}
-          <button className="primary-button" type="submit">
+
+        <div className="auth-tabs">
+          <button
+            className={`auth-tab${mode === "login" ? " active" : ""}`}
+            onClick={() => switchMode("login")}
+            type="button"
+          >
             Entrar
           </button>
-        </form>
+          <button
+            className={`auth-tab${mode === "register" ? " active" : ""}`}
+            onClick={() => switchMode("register")}
+            type="button"
+          >
+            Criar conta
+          </button>
+        </div>
+
+        {info ? <p className="form-info">{info}</p> : null}
+
+        {mode === "login" ? (
+          <form className="login-form" onSubmit={handleLogin}>
+            <label>
+              Email
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                type="email"
+                required
+              />
+            </label>
+            <label>
+              Senha
+              <input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="senha"
+                type="password"
+                required
+              />
+            </label>
+            {error ? <p className="form-error">{error}</p> : null}
+            <button className="primary-button" type="submit" disabled={submitting}>
+              {submitting ? "Entrando..." : "Entrar"}
+            </button>
+          </form>
+        ) : (
+          <form className="login-form" onSubmit={handleRegister}>
+            <label>
+              Nome completo
+              <input
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                placeholder="Seu nome"
+                required
+              />
+            </label>
+            <label>
+              Email
+              <input
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="seu@email.com"
+                type="email"
+                required
+              />
+            </label>
+            <label>
+              Senha
+              <input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="minimo 6 caracteres"
+                type="password"
+                required
+                minLength={6}
+              />
+            </label>
+            <div className="form-pair">
+              <label>
+                Funcao
+                <select value={role} onChange={(e) => setRole(e.target.value as Role)}>
+                  <option value="colaborador">Colaborador</option>
+                  <option value="gestor">Gestor</option>
+                </select>
+              </label>
+              <label>
+                Equipe
+                <input
+                  value={team}
+                  onChange={(e) => setTeam(e.target.value)}
+                  placeholder="Ex: Marketing"
+                />
+              </label>
+            </div>
+            {error ? <p className="form-error">{error}</p> : null}
+            <button className="primary-button" type="submit" disabled={submitting}>
+              {submitting ? "Criando conta..." : "Criar conta"}
+            </button>
+          </form>
+        )}
       </section>
+
       <section className="login-preview">
         <div className="preview-topline">
           <Sparkles size={18} />
@@ -292,37 +394,41 @@ function Login({ onLogin }: { onLogin: (user: User) => void }) {
         </div>
         <div className="preview-board">
           <div>
-            <strong>Agenda salva</strong>
-            <p>As demandas continuam no navegador mesmo apos recarregar a pagina.</p>
+            <strong>Agenda sincronizada</strong>
+            <p>Demandas salvas no banco de dados, acessiveis de qualquer dispositivo.</p>
           </div>
           <div>
             <strong>Kanban</strong>
             <p>Gestor e equipe acompanham status por etapa de trabalho.</p>
           </div>
           <div>
-            <strong>Operacao</strong>
-            <p>Criar, editar, excluir e filtrar demandas com dados salvos no navegador.</p>
+            <strong>Colaboracao</strong>
+            <p>Gestor cria e distribui tarefas. Equipe atualiza o progresso em tempo real.</p>
           </div>
         </div>
         <div className="preview-metrics">
           <span>4 status de fluxo</span>
-          <span>3 areas de equipe</span>
-          <span>Preceptor</span>
+          <span>Multi-usuario</span>
+          <span>Supabase</span>
         </div>
       </section>
     </main>
   );
 }
 
+// ─── Dashboard ────────────────────────────────────────────────
+
 function Dashboard({
   currentUser,
+  allUsers,
   items,
-  setItems,
+  onRefresh,
   onLogout,
 }: {
   currentUser: User;
+  allUsers: User[];
   items: WorkItem[];
-  setItems: React.Dispatch<React.SetStateAction<WorkItem[]>>;
+  onRefresh: () => Promise<void>;
   onLogout: () => void;
 }) {
   const [query, setQuery] = useState("");
@@ -334,7 +440,11 @@ function Dashboard({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(today);
-  const [form, setForm] = useState<WorkForm>(emptyForm);
+  const [saving, setSaving] = useState(false);
+
+  const colaboradores = allUsers.filter((u) => u.role === "colaborador");
+  const firstColabId = colaboradores[0]?.id ?? "";
+  const [form, setForm] = useState<WorkForm>(() => makeEmptyForm(firstColabId));
 
   const visibleItems = useMemo(() => {
     return items
@@ -345,12 +455,12 @@ function Dashboard({
       .filter((item) => ownerFilter === "todos" || item.ownerId === ownerFilter)
       .filter((item) => kindFilter === "todos" || item.kind === kindFilter)
       .filter((item) => {
-        const owner = users.find((user) => user.id === item.ownerId)?.name ?? "";
+        const owner = allUsers.find((u) => u.id === item.ownerId)?.name ?? "";
         const text = `${item.title} ${item.project} ${item.notes} ${owner}`.toLowerCase();
         return text.includes(query.toLowerCase());
       })
       .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
-  }, [currentUser, items, kindFilter, ownerFilter, query, statusFilter]);
+  }, [currentUser, items, allUsers, kindFilter, ownerFilter, query, statusFilter]);
 
   const metrics = {
     total: visibleItems.length,
@@ -360,79 +470,79 @@ function Dashboard({
   };
 
   const nextDue = visibleItems.filter((item) => item.status !== "concluida").slice(0, 3);
-  const visibleTeamUsers = users.filter((user) => {
-    if (user.role !== "colaborador") return false;
+
+  const visibleTeamUsers = colaboradores.filter((user) => {
     if (currentUser.role === "colaborador" && user.id !== currentUser.id) return false;
     if (ownerFilter !== "todos" && user.id !== ownerFilter) return false;
-
     const hasVisibleItems = visibleItems.some((item) => item.ownerId === user.id);
-    const queryMatchesUser = `${user.name} ${user.team}`.toLowerCase().includes(query.toLowerCase());
-
-    return query.trim() ? hasVisibleItems || queryMatchesUser : ownerFilter !== "todos" || hasVisibleItems;
+    const queryMatchesUser = `${user.name} ${user.team}`
+      .toLowerCase()
+      .includes(query.toLowerCase());
+    return query.trim()
+      ? hasVisibleItems || queryMatchesUser
+      : ownerFilter !== "todos" || hasVisibleItems;
   });
 
-  const teamStats = visibleTeamUsers
-    .map((user) => {
-      const assigned = visibleItems.filter((item) => item.ownerId === user.id);
-      return {
-        user,
-        total: assigned.length,
-        pending: assigned.filter((item) => item.status !== "concluida").length,
-        overdue: assigned.filter((item) => isOverdue(item)).length,
-        done: assigned.filter((item) => item.status === "concluida").length,
-      };
-    });
+  const teamStats = visibleTeamUsers.map((user) => {
+    const assigned = visibleItems.filter((item) => item.ownerId === user.id);
+    return {
+      user,
+      total: assigned.length,
+      pending: assigned.filter((item) => item.status !== "concluida").length,
+      overdue: assigned.filter((item) => isOverdue(item)).length,
+      done: assigned.filter((item) => item.status === "concluida").length,
+    };
+  });
+
   const statusStats = (Object.keys(statusLabel) as Status[]).map((status) => ({
     status,
     total: visibleItems.filter((item) => item.status === status).length,
   }));
 
   function resetForm() {
-    setForm(emptyForm);
+    setForm(makeEmptyForm(firstColabId));
     setEditingId(null);
     setComposerOpen(false);
   }
 
-  function saveItem(event: React.FormEvent) {
+  async function saveItem(event: React.FormEvent) {
     event.preventDefault();
+    setSaving(true);
     const timestamp = new Date().toISOString();
+    const payload = {
+      title: form.title,
+      owner_id: form.ownerId,
+      kind: form.kind,
+      date: form.date,
+      time: form.time,
+      priority: form.priority,
+      project: form.project,
+      notes: form.notes,
+      updated_at: timestamp,
+    };
 
     if (editingId) {
-      setItems((current) =>
-        current.map((item) =>
-          item.id === editingId
-            ? {
-                ...item,
-                ...form,
-                status: form.status ?? item.status,
-                updatedAt: timestamp,
-              }
-            : item
-        )
-      );
-      resetForm();
-      return;
+      await supabase
+        .from("work_items")
+        .update({ ...payload, status: form.status })
+        .eq("id", editingId);
+    } else {
+      await supabase
+        .from("work_items")
+        .insert({ ...payload, status: "planejada", created_at: timestamp });
     }
 
-    setItems((current) => [
-      {
-        id: Date.now(),
-        ...form,
-        status: "planejada",
-        createdAt: timestamp,
-        updatedAt: timestamp,
-      },
-      ...current,
-    ]);
+    await onRefresh();
+    setSaving(false);
     resetForm();
   }
 
-  function updateStatus(id: number, status: Status) {
-    setItems((current) =>
-      current.map((item) =>
-        item.id === id ? { ...item, status, updatedAt: new Date().toISOString() } : item
-      )
-    );
+  async function updateStatus(id: number, status: Status) {
+    await supabase
+      .from("work_items")
+      .update({ status, updated_at: new Date().toISOString() })
+      .eq("id", id);
+    await onRefresh();
   }
 
   function editItem(item: WorkItem) {
@@ -451,33 +561,23 @@ function Dashboard({
     });
   }
 
-  function deleteItem(id: number) {
+  async function deleteItem(id: number) {
     const item = items.find((current) => current.id === id);
     if (!item) return;
-    const confirmed = window.confirm(`Excluir a demanda "${item.title}"?`);
-    if (!confirmed) return;
-    setItems((current) => current.filter((current) => current.id !== id));
+    if (!window.confirm(`Excluir a demanda "${item.title}"?`)) return;
+    await supabase.from("work_items").delete().eq("id", id);
+    await onRefresh();
     if (editingId === id) resetForm();
-  }
-
-  function restoreSampleData() {
-    const confirmed = window.confirm("Restaurar os dados de exemplo e apagar alteracoes locais?");
-    if (!confirmed) return;
-    setItems(initialItems);
-    resetForm();
   }
 
   function navigate(section: NavSection) {
     setActiveNav(section);
-
-    if (section === "agenda" || section === "kanban") {
-      setViewMode(section);
-    }
+    if (section === "agenda" || section === "kanban") setViewMode(section);
   }
 
   function startNewDemand() {
     setEditingId(null);
-    setForm(emptyForm);
+    setForm(makeEmptyForm(firstColabId));
     setComposerOpen(true);
   }
 
@@ -494,19 +594,31 @@ function Dashboard({
           </div>
         </div>
         <nav>
-          <button className={activeNav === "agenda" ? "active" : ""} onClick={() => navigate("agenda")}>
+          <button
+            className={activeNav === "agenda" ? "active" : ""}
+            onClick={() => navigate("agenda")}
+          >
             <CalendarDays size={18} />
             Agenda
           </button>
-          <button className={activeNav === "kanban" ? "active" : ""} onClick={() => navigate("kanban")}>
+          <button
+            className={activeNav === "kanban" ? "active" : ""}
+            onClick={() => navigate("kanban")}
+          >
             <KanbanSquare size={18} />
             Kanban
           </button>
-          <button className={activeNav === "equipe" ? "active" : ""} onClick={() => navigate("equipe")}>
+          <button
+            className={activeNav === "equipe" ? "active" : ""}
+            onClick={() => navigate("equipe")}
+          >
             <UsersRound size={18} />
             Equipe
           </button>
-          <button className={activeNav === "indicadores" ? "active" : ""} onClick={() => navigate("indicadores")}>
+          <button
+            className={activeNav === "indicadores" ? "active" : ""}
+            onClick={() => navigate("indicadores")}
+          >
             <BarChart3 size={18} />
             Indicadores
           </button>
@@ -533,9 +645,6 @@ function Dashboard({
                 Nova demanda
               </button>
             ) : null}
-            <button className="ghost-button icon-button" onClick={restoreSampleData} title="Restaurar dados">
-              <RotateCcw size={18} />
-            </button>
             <div className="user-chip">
               <UserRound size={18} />
               <span>{currentUser.name}</span>
@@ -606,13 +715,11 @@ function Dashboard({
               onChange={(event) => setOwnerFilter(event.target.value)}
             >
               <option value="todos">Todos os responsaveis</option>
-              {users
-                .filter((user) => user.role === "colaborador")
-                .map((user) => (
-                  <option key={user.id} value={user.id}>
-                    {user.name}
-                  </option>
-                ))}
+              {colaboradores.map((user) => (
+                <option key={user.id} value={user.id}>
+                  {user.name}
+                </option>
+              ))}
             </select>
           ) : null}
         </section>
@@ -620,107 +727,129 @@ function Dashboard({
         {activeNav === "equipe" ? (
           <TeamPage stats={teamStats} items={visibleItems} />
         ) : activeNav === "indicadores" ? (
-          <IndicatorsPage metrics={metrics} statusStats={statusStats} visibleItems={visibleItems} />
+          <IndicatorsPage
+            metrics={metrics}
+            statusStats={statusStats}
+            visibleItems={visibleItems}
+          />
         ) : (
-        <section className="main-grid">
-          <div className="agenda-panel" id={viewMode}>
-            <div className="section-heading">
-              <div>
-                <p className="eyebrow">{viewMode === "agenda" ? "Agenda" : "Kanban"}</p>
-                <h3>{viewMode === "agenda" ? "Proximos compromissos" : "Fluxo de trabalho"}</h3>
+          <section className="main-grid">
+            <div className="agenda-panel" id={viewMode}>
+              <div className="section-heading">
+                <div>
+                  <p className="eyebrow">{viewMode === "agenda" ? "Agenda" : "Kanban"}</p>
+                  <h3>
+                    {viewMode === "agenda" ? "Proximos compromissos" : "Fluxo de trabalho"}
+                  </h3>
+                </div>
+                <span className="save-hint">Salvo no banco de dados</span>
               </div>
-              <span className="save-hint">Salvo neste navegador</span>
-            </div>
 
-            {visibleItems.length === 0 ? (
-              <div className="empty-state">
-                <strong>Nenhuma demanda encontrada</strong>
-                <p>Ajuste os filtros ou crie uma nova atividade para a equipe.</p>
-              </div>
-            ) : viewMode === "agenda" ? (
-              <CalendarView
-                items={visibleItems}
-                selectedDate={selectedDate}
-                onSelectDate={setSelectedDate}
-                currentUser={currentUser}
-                onStatusChange={updateStatus}
-                onEdit={editItem}
-                onDelete={deleteItem}
-              />
-            ) : (
-              <KanbanBoard
-                items={visibleItems}
-                currentUser={currentUser}
-                onStatusChange={updateStatus}
-                onEdit={editItem}
-                onDelete={deleteItem}
-              />
-            )}
-          </div>
-
-          <div className="side-panel">
-            {currentUser.role === "gestor" ? (
-              <div className="team-panel action-panel">
-                <p className="eyebrow">Gestor</p>
-                <h3>Demandas</h3>
-                <p className="muted-text">
-                  Crie tarefas, reunioes e entregas pelo botao principal. Edicoes abrem no mesmo painel.
-                </p>
-                <button className="primary-button" onClick={startNewDemand}>
-                  <Plus size={18} />
-                  Criar demanda
-                </button>
-              </div>
-            ) : (
-              <div className="team-panel collaborator-note">
-                <p className="eyebrow">Colaborador</p>
-                <h3>Minha fila</h3>
-                <p>
-                  Acompanhe suas tarefas, reunioes e entregas. Atualize o status
-                  quando avancar para manter o gestor alinhado.
-                </p>
-              </div>
-            )}
-
-            <div className="team-panel">
-              <p className="eyebrow">Alertas</p>
-              <h3>Proximos prazos</h3>
-              {nextDue.length ? (
-                nextDue.map((item) => (
-                  <div className="alert-row" key={item.id}>
-                    <span>{item.title}</span>
-                    <small>{formatDate(item.date)} as {item.time}</small>
-                  </div>
-                ))
+              {visibleItems.length === 0 ? (
+                <div className="empty-state">
+                  <strong>Nenhuma demanda encontrada</strong>
+                  <p>Ajuste os filtros ou crie uma nova atividade para a equipe.</p>
+                </div>
+              ) : viewMode === "agenda" ? (
+                <CalendarView
+                  items={visibleItems}
+                  allUsers={allUsers}
+                  selectedDate={selectedDate}
+                  onSelectDate={setSelectedDate}
+                  currentUser={currentUser}
+                  onStatusChange={updateStatus}
+                  onEdit={editItem}
+                  onDelete={deleteItem}
+                />
               ) : (
-                <p className="muted-text">Nada pendente nos filtros atuais.</p>
+                <KanbanBoard
+                  items={visibleItems}
+                  allUsers={allUsers}
+                  currentUser={currentUser}
+                  onStatusChange={updateStatus}
+                  onEdit={editItem}
+                  onDelete={deleteItem}
+                />
               )}
             </div>
 
-            <div className="team-panel" id="equipe">
-              <p className="eyebrow">Equipe</p>
-              <h3>Colaboradores</h3>
-              {users
-                .filter((user) => user.role === "colaborador")
-                .map((user) => (
-                  <div className="team-row" key={user.id}>
-                    <span>{user.name}</span>
-                    <small>{user.team}</small>
-                  </div>
-                ))}
+            <div className="side-panel">
+              {currentUser.role === "gestor" ? (
+                <div className="team-panel action-panel">
+                  <p className="eyebrow">Gestor</p>
+                  <h3>Demandas</h3>
+                  <p className="muted-text">
+                    Crie tarefas, reunioes e entregas pelo botao principal.
+                  </p>
+                  <button className="primary-button" onClick={startNewDemand}>
+                    <Plus size={18} />
+                    Criar demanda
+                  </button>
+                </div>
+              ) : (
+                <div className="team-panel collaborator-note">
+                  <p className="eyebrow">Colaborador</p>
+                  <h3>Minha fila</h3>
+                  <p>
+                    Acompanhe suas tarefas, reunioes e entregas. Atualize o status quando avancar
+                    para manter o gestor alinhado.
+                  </p>
+                </div>
+              )}
+
+              <div className="team-panel">
+                <p className="eyebrow">Alertas</p>
+                <h3>Proximos prazos</h3>
+                {nextDue.length ? (
+                  nextDue.map((item) => (
+                    <div className="alert-row" key={item.id}>
+                      <span>{item.title}</span>
+                      <small>
+                        {formatDate(item.date)} as {item.time}
+                      </small>
+                    </div>
+                  ))
+                ) : (
+                  <p className="muted-text">Nada pendente nos filtros atuais.</p>
+                )}
+              </div>
+
+              <div className="team-panel" id="equipe">
+                <p className="eyebrow">Equipe</p>
+                <h3>Colaboradores</h3>
+                {colaboradores.length === 0 ? (
+                  <p className="muted-text">Nenhum colaborador cadastrado ainda.</p>
+                ) : (
+                  colaboradores.map((user) => (
+                    <div className="team-row" key={user.id}>
+                      <span>{user.name}</span>
+                      <small>{user.team}</small>
+                    </div>
+                  ))
+                )}
+              </div>
             </div>
-          </div>
-        </section>
+          </section>
         )}
+
         {composerOpen && currentUser.role === "gestor" ? (
           <div className="drawer-backdrop" role="presentation">
-            <form className="task-drawer" onSubmit={saveItem} aria-label="Formulario de demanda">
+            <form
+              className="task-drawer"
+              onSubmit={saveItem}
+              aria-label="Formulario de demanda"
+            >
               <div className="drawer-header">
                 <div>
                   <p className="eyebrow">{editingId ? "Edicao" : "Nova demanda"}</p>
                   <h3>{editingId ? "Editar demanda" : "Planejar atividade"}</h3>
                 </div>
-                <button className="ghost-button icon-button" type="button" onClick={resetForm} title="Fechar">
+                <button
+                  className="ghost-button icon-button"
+                  type="button"
+                  onClick={resetForm}
+                  title="Fechar"
+                >
                   <X size={18} />
                 </button>
               </div>
@@ -739,13 +868,16 @@ function Dashboard({
                   value={form.ownerId}
                   onChange={(event) => setForm({ ...form, ownerId: event.target.value })}
                 >
-                  {users
-                    .filter((user) => user.role === "colaborador")
-                    .map((user) => (
+                  {colaboradores.length === 0 ? (
+                    <option value="">Nenhum colaborador cadastrado</option>
+                  ) : (
+                    colaboradores.map((user) => (
                       <option key={user.id} value={user.id}>
-                        {user.name} - {user.team}
+                        {user.name}
+                        {user.team ? ` — ${user.team}` : ""}
                       </option>
-                    ))}
+                    ))
+                  )}
                 </select>
               </label>
               <div className="form-pair">
@@ -753,7 +885,9 @@ function Dashboard({
                   Tipo
                   <select
                     value={form.kind}
-                    onChange={(event) => setForm({ ...form, kind: event.target.value as Kind })}
+                    onChange={(event) =>
+                      setForm({ ...form, kind: event.target.value as Kind })
+                    }
                   >
                     <option value="tarefa">Tarefa</option>
                     <option value="reuniao">Reuniao</option>
@@ -779,7 +913,9 @@ function Dashboard({
                   Status
                   <select
                     value={form.status}
-                    onChange={(event) => setForm({ ...form, status: event.target.value as Status })}
+                    onChange={(event) =>
+                      setForm({ ...form, status: event.target.value as Status })
+                    }
                   >
                     <option value="planejada">Planejada</option>
                     <option value="em-andamento">Em andamento</option>
@@ -825,9 +961,9 @@ function Dashboard({
                 />
               </label>
               <div className="form-actions">
-                <button className="primary-button" type="submit">
+                <button className="primary-button" type="submit" disabled={saving}>
                   <Save size={18} />
-                  {editingId ? "Salvar alteracoes" : "Criar demanda"}
+                  {saving ? "Salvando..." : editingId ? "Salvar alteracoes" : "Criar demanda"}
                 </button>
                 <button className="ghost-button" type="button" onClick={resetForm}>
                   Cancelar
@@ -840,6 +976,8 @@ function Dashboard({
     </main>
   );
 }
+
+// ─── Pagina Equipe ────────────────────────────────────────────
 
 function TeamPage({
   stats,
@@ -870,40 +1008,42 @@ function TeamPage({
       ) : (
         <div className="team-grid">
           {stats.map(({ user, total, pending, overdue, done }) => {
-          const assigned = items
-            .filter((item) => item.ownerId === user.id && item.status !== "concluida")
-            .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))
-            .slice(0, 3);
+            const assigned = items
+              .filter((item) => item.ownerId === user.id && item.status !== "concluida")
+              .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`))
+              .slice(0, 3);
 
-          return (
-            <article className="person-card" key={user.id}>
-              <div className="person-header">
-                <div>
-                  <strong>{user.name}</strong>
-                  <span>{user.team}</span>
+            return (
+              <article className="person-card" key={user.id}>
+                <div className="person-header">
+                  <div>
+                    <strong>{user.name}</strong>
+                    <span>{user.team}</span>
+                  </div>
+                  <UserRound size={22} />
                 </div>
-                <UserRound size={22} />
-              </div>
-              <div className="person-stats">
-                <span>{total} total</span>
-                <span>{pending} pendentes</span>
-                <span>{done} concluidas</span>
-                <span className={overdue ? "danger-text" : ""}>{overdue} atrasadas</span>
-              </div>
-              <div className="mini-list">
-                {assigned.length ? (
-                  assigned.map((item) => (
-                    <div key={item.id}>
-                      <strong>{item.title}</strong>
-                      <small>{formatDate(item.date)} as {item.time}</small>
-                    </div>
-                  ))
-                ) : (
-                  <p className="muted-text">Sem pendencias no momento.</p>
-                )}
-              </div>
-            </article>
-          );
+                <div className="person-stats">
+                  <span>{total} total</span>
+                  <span>{pending} pendentes</span>
+                  <span>{done} concluidas</span>
+                  <span className={overdue ? "danger-text" : ""}>{overdue} atrasadas</span>
+                </div>
+                <div className="mini-list">
+                  {assigned.length ? (
+                    assigned.map((item) => (
+                      <div key={item.id}>
+                        <strong>{item.title}</strong>
+                        <small>
+                          {formatDate(item.date)} as {item.time}
+                        </small>
+                      </div>
+                    ))
+                  ) : (
+                    <p className="muted-text">Sem pendencias no momento.</p>
+                  )}
+                </div>
+              </article>
+            );
           })}
         </div>
       )}
@@ -911,17 +1051,14 @@ function TeamPage({
   );
 }
 
+// ─── Pagina Indicadores ───────────────────────────────────────
+
 function IndicatorsPage({
   metrics,
   statusStats,
   visibleItems,
 }: {
-  metrics: {
-    total: number;
-    pending: number;
-    overdue: number;
-    deliveries: number;
-  };
+  metrics: { total: number; pending: number; overdue: number; deliveries: number };
   statusStats: Array<{ status: Status; total: number }>;
   visibleItems: WorkItem[];
 }) {
@@ -976,6 +1113,8 @@ function IndicatorsPage({
   );
 }
 
+// ─── Componentes auxiliares ───────────────────────────────────
+
 function Metric({
   icon,
   label,
@@ -996,6 +1135,7 @@ function Metric({
 
 function CalendarView({
   items,
+  allUsers,
   selectedDate,
   onSelectDate,
   currentUser,
@@ -1004,6 +1144,7 @@ function CalendarView({
   onDelete,
 }: {
   items: WorkItem[];
+  allUsers: User[];
   selectedDate: string;
   onSelectDate: (date: string) => void;
   currentUser: User;
@@ -1048,7 +1189,9 @@ function CalendarView({
 
             return (
               <button
-                className={`calendar-day ${isCurrentMonth ? "" : "outside-month"} ${isSelected ? "selected-day" : ""}`}
+                className={`calendar-day ${isCurrentMonth ? "" : "outside-month"} ${
+                  isSelected ? "selected-day" : ""
+                }`}
                 key={day.date}
                 onClick={() => onSelectDate(day.date)}
               >
@@ -1076,9 +1219,12 @@ function CalendarView({
               <WorkCard
                 key={item.id}
                 item={item}
+                allUsers={allUsers}
                 compact
                 canManage={currentUser.role === "gestor"}
-                canEditStatus={currentUser.role === "gestor" || item.ownerId === currentUser.id}
+                canEditStatus={
+                  currentUser.role === "gestor" || item.ownerId === currentUser.id
+                }
                 onStatusChange={onStatusChange}
                 onEdit={onEdit}
                 onDelete={onDelete}
@@ -1098,12 +1244,14 @@ function CalendarView({
 
 function KanbanBoard({
   items,
+  allUsers,
   currentUser,
   onStatusChange,
   onEdit,
   onDelete,
 }: {
   items: WorkItem[];
+  allUsers: User[];
   currentUser: User;
   onStatusChange: (id: number, status: Status) => void;
   onEdit: (item: WorkItem) => void;
@@ -1126,9 +1274,12 @@ function KanbanBoard({
                 <WorkCard
                   key={item.id}
                   item={item}
+                  allUsers={allUsers}
                   compact
                   canManage={currentUser.role === "gestor"}
-                  canEditStatus={currentUser.role === "gestor" || item.ownerId === currentUser.id}
+                  canEditStatus={
+                    currentUser.role === "gestor" || item.ownerId === currentUser.id
+                  }
                   onStatusChange={onStatusChange}
                   onEdit={onEdit}
                   onDelete={onDelete}
@@ -1144,6 +1295,7 @@ function KanbanBoard({
 
 function WorkCard({
   item,
+  allUsers,
   compact,
   canManage,
   canEditStatus,
@@ -1152,6 +1304,7 @@ function WorkCard({
   onDelete,
 }: {
   item: WorkItem;
+  allUsers: User[];
   compact: boolean;
   canManage: boolean;
   canEditStatus: boolean;
@@ -1159,11 +1312,15 @@ function WorkCard({
   onEdit: (item: WorkItem) => void;
   onDelete: (id: number) => void;
 }) {
-  const owner = users.find((user) => user.id === item.ownerId);
+  const owner = allUsers.find((u) => u.id === item.ownerId);
   const overdue = isOverdue(item);
 
   return (
-    <article className={`work-card priority-${item.priority.toLowerCase()} ${compact ? "compact-card" : ""}`}>
+    <article
+      className={`work-card priority-${item.priority.toLowerCase()} ${
+        compact ? "compact-card" : ""
+      }`}
+    >
       {!compact ? (
         <div className="card-date">
           <strong>{formatDate(item.date, true)}</strong>
@@ -1179,9 +1336,11 @@ function WorkCard({
         <h4>{item.title}</h4>
         <p>{item.notes}</p>
         <div className="meta-line">
-          <span>{owner?.name}</span>
+          <span>{owner?.name ?? "—"}</span>
           <span>{item.project || "Sem projeto"}</span>
-          <span>{formatDate(item.date)} as {item.time}</span>
+          <span>
+            {formatDate(item.date)} as {item.time}
+          </span>
           <span>Prioridade {item.priority}</span>
         </div>
         <div className="card-actions">
@@ -1199,10 +1358,18 @@ function WorkCard({
           ) : null}
           {canManage ? (
             <div className="icon-actions">
-              <button className="ghost-button icon-button" onClick={() => onEdit(item)} title="Editar">
+              <button
+                className="ghost-button icon-button"
+                onClick={() => onEdit(item)}
+                title="Editar"
+              >
                 <Edit3 size={16} />
               </button>
-              <button className="danger-button icon-button" onClick={() => onDelete(item.id)} title="Excluir">
+              <button
+                className="danger-button icon-button"
+                onClick={() => onDelete(item.id)}
+                title="Excluir"
+              >
                 <Trash2 size={16} />
               </button>
             </div>
@@ -1212,6 +1379,8 @@ function WorkCard({
     </article>
   );
 }
+
+// ─── Utilitários ─────────────────────────────────────────────
 
 function formatDate(date: string, short = false) {
   return new Date(`${date}T00:00:00`).toLocaleDateString("pt-BR", {
@@ -1238,12 +1407,7 @@ function buildCalendarDays(year: number, month: number) {
     const date = new Date(start);
     date.setDate(start.getDate() + index);
     const value = toDateInputValue(date);
-
-    return {
-      date: value,
-      label: String(date.getDate()),
-      month: date.getMonth(),
-    };
+    return { date: value, label: String(date.getDate()), month: date.getMonth() };
   });
 }
 
@@ -1257,5 +1421,7 @@ function toDateInputValue(date: Date) {
 function isOverdue(item: WorkItem) {
   return item.status !== "concluida" && item.date < today;
 }
+
+// ─── Mount ───────────────────────────────────────────────────
 
 createRoot(document.getElementById("root")!).render(<App />);
