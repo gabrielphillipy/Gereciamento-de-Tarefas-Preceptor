@@ -793,12 +793,21 @@ nav button.active::before {
   overflow: hidden;
   display: grid;
   gap: 5px;
+  width: 100%;
   padding: 20px;
+  text-align: left;
+  font: inherit;
+  color: inherit;
+  cursor: pointer;
   border-radius: var(--r-md);
   background: linear-gradient(180deg, #ffffff, #f7f9ff);
   border: 1px solid var(--line);
   box-shadow: var(--shadow-md);
   transition: transform 0.2s var(--ease), box-shadow 0.2s var(--ease);
+}
+
+.metric-card:active {
+  transform: translateY(-1px);
 }
 
 .metric-card::after {
@@ -1002,9 +1011,8 @@ nav button.active::before {
 
 .main-grid {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) 332px;
+  grid-template-columns: 1fr;
   gap: 20px;
-  align-items: start;
 }
 
 .agenda-panel,
@@ -1483,7 +1491,9 @@ nav button.active::before {
 
 .side-panel {
   display: grid;
+  grid-template-columns: repeat(3, 1fr);
   gap: 18px;
+  align-items: start;
 }
 
 .team-panel {
@@ -2070,6 +2080,296 @@ nav button.active::before {
   }
 }
 
+/* ─── Calendário: períodos dia/semana/mês/ano ─────────────── */
+
+.calendar-shell {
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  overflow: hidden;
+  background: var(--surface);
+}
+
+.cal-toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+  padding: 14px 16px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--blue-50), var(--surface));
+}
+
+.cal-nav {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.cal-nav .icon-button {
+  width: 38px;
+  min-height: 38px;
+}
+
+.cal-nav .ghost-button {
+  min-height: 38px;
+}
+
+.cal-title {
+  margin-left: 6px;
+  font-size: 1.04rem;
+  font-weight: 650;
+  letter-spacing: -0.015em;
+  color: var(--ink);
+  text-transform: capitalize;
+}
+
+.cal-periods {
+  display: inline-flex;
+  gap: 3px;
+  padding: 4px;
+  border-radius: var(--r-sm);
+  background: var(--surface-3);
+}
+
+.cal-periods button {
+  min-height: 34px;
+  padding: 0 15px;
+  border: 0;
+  border-radius: 8px;
+  background: transparent;
+  color: var(--ink-soft);
+  font-weight: 550;
+  font-size: 0.84rem;
+  cursor: pointer;
+  transition: background 0.15s var(--ease), color 0.15s var(--ease);
+}
+
+.cal-periods button:hover {
+  color: var(--ink);
+}
+
+.cal-periods button.selected {
+  background: var(--surface);
+  color: var(--blue-700);
+  font-weight: 600;
+  box-shadow: var(--shadow-sm);
+}
+
+/* Visão Semana */
+.week-grid {
+  display: grid;
+  grid-template-columns: repeat(7, minmax(0, 1fr));
+}
+
+.week-col {
+  display: flex;
+  flex-direction: column;
+  min-height: 440px;
+  border: 0;
+  border-right: 1px solid var(--line);
+  background: var(--surface);
+  text-align: left;
+  cursor: pointer;
+  padding: 0;
+  transition: background 0.14s var(--ease);
+}
+
+.week-col:last-child {
+  border-right: 0;
+}
+
+.week-col:hover {
+  background: var(--blue-50);
+}
+
+.week-col.is-selected {
+  box-shadow: inset 0 0 0 2px var(--blue-500);
+}
+
+.week-col-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 12px;
+  border-bottom: 1px solid var(--line);
+  background: var(--surface-2);
+}
+
+.week-col-head span {
+  font-size: 0.72rem;
+  font-weight: 600;
+  color: var(--muted);
+  text-transform: uppercase;
+}
+
+.week-col-head .day-number {
+  width: 26px;
+  height: 26px;
+}
+
+.week-col.is-today .week-col-head {
+  background: var(--blue-100);
+}
+
+.week-col.is-today .week-col-head .day-number {
+  background: var(--blue-500);
+  color: #ffffff;
+}
+
+.week-col-body {
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  align-content: start;
+}
+
+.week-col-body em {
+  color: var(--muted);
+  font-size: 0.78rem;
+  font-style: normal;
+}
+
+/* Visão Dia */
+.day-view {
+  padding: 18px;
+}
+
+/* Visão Ano */
+.year-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  padding: 18px;
+}
+
+.mini-month {
+  border: 1px solid var(--line);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  padding: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: transform 0.16s var(--ease), box-shadow 0.16s var(--ease),
+    border-color 0.16s var(--ease);
+}
+
+.mini-month:hover {
+  transform: translateY(-2px);
+  box-shadow: var(--shadow-md);
+  border-color: var(--blue-200);
+}
+
+.mini-month > strong {
+  display: block;
+  margin-bottom: 9px;
+  font-size: 0.9rem;
+  font-weight: 650;
+  text-transform: capitalize;
+  color: var(--ink);
+}
+
+.mini-weekdays,
+.mini-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 2px;
+}
+
+.mini-weekdays span {
+  text-align: center;
+  font-size: 0.6rem;
+  font-weight: 600;
+  color: var(--muted);
+}
+
+.mini-grid {
+  margin-top: 4px;
+}
+
+.mini-day {
+  aspect-ratio: 1;
+  display: grid;
+  place-items: center;
+  font-size: 0.66rem;
+  font-weight: 500;
+  color: var(--ink-soft);
+  border-radius: 5px;
+}
+
+.mini-out {
+  color: #c4c9da;
+}
+
+.mini-has {
+  background: var(--blue-100);
+  color: var(--blue-700);
+  font-weight: 700;
+}
+
+.mini-today {
+  box-shadow: inset 0 0 0 1.5px var(--blue-500);
+}
+
+/* ─── Modal ───────────────────────────────────────────────── */
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  background: rgba(12, 23, 56, 0.55);
+  backdrop-filter: blur(5px);
+  animation: backdrop-in 0.2s var(--ease);
+}
+
+.modal-card {
+  width: min(100%, 560px);
+  max-height: min(82vh, 760px);
+  display: flex;
+  flex-direction: column;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-lg);
+  box-shadow: var(--shadow-lg);
+  overflow: hidden;
+  animation: modal-in 0.24s var(--ease);
+}
+
+@keyframes modal-in {
+  from {
+    transform: translateY(18px) scale(0.98);
+    opacity: 0;
+  }
+}
+
+.modal-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 20px 22px;
+  border-bottom: 1px solid var(--line);
+  background: linear-gradient(180deg, var(--blue-50), var(--surface));
+}
+
+.modal-head h3 {
+  margin: 2px 0 0;
+  font-size: 1.2rem;
+}
+
+.modal-body {
+  padding: 20px 22px;
+  overflow-y: auto;
+}
+
+.modal-body .day-list {
+  display: grid;
+  gap: 11px;
+}
+
 /* ─── Responsivo ──────────────────────────────────────────── */
 
 @media (max-width: 1140px) {
@@ -2111,6 +2411,12 @@ nav button.active::before {
   .team-grid,
   .insights-grid,
   .report-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .side-panel {
+    grid-template-columns: 1fr;
+  }
+  .year-grid {
     grid-template-columns: repeat(2, 1fr);
   }
 }
@@ -2172,12 +2478,17 @@ nav button.active::before {
   .work-card {
     grid-template-columns: 1fr;
   }
-  .calendar-panel {
+  .calendar-panel,
+  .calendar-shell {
     overflow-x: auto;
   }
   .calendar-weekdays,
-  .calendar-grid {
+  .calendar-grid,
+  .week-grid {
     min-width: 660px;
+  }
+  .year-grid {
+    grid-template-columns: 1fr;
   }
   .card-actions {
     align-items: stretch;
@@ -2186,4 +2497,147 @@ nav button.active::before {
   .status-select {
     max-width: none;
   }
+}
+
+/* ─── Notificações ───────────────────────────────────────── */
+
+.notif {
+  position: relative;
+}
+
+.notif-bell {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 46px;
+  height: 46px;
+  border: 1px solid var(--line-strong);
+  border-radius: var(--r-sm);
+  background: var(--surface);
+  color: var(--ink-soft);
+  box-shadow: var(--shadow-xs);
+  transition: background 0.16s var(--ease), border-color 0.16s var(--ease);
+}
+
+.notif-bell:hover {
+  background: var(--blue-50);
+  border-color: var(--blue-300);
+  color: var(--blue-700);
+}
+
+.notif-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  border-radius: var(--r-pill);
+  background: var(--coral);
+  color: #ffffff;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.notif-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+}
+
+.notif-panel {
+  position: absolute;
+  top: calc(100% + 10px);
+  right: 0;
+  z-index: 61;
+  width: min(92vw, 350px);
+  max-height: 70vh;
+  overflow-y: auto;
+  display: grid;
+  gap: 14px;
+  padding: 16px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r-md);
+  box-shadow: var(--shadow-lg);
+  animation: toast-in 0.2s var(--ease);
+}
+
+.notif-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.notif-head strong {
+  font-size: 1rem;
+}
+
+.notif-empty {
+  margin: 0;
+  font-size: 0.88rem;
+}
+
+.notif-group {
+  display: grid;
+  gap: 7px;
+}
+
+.notif-tag {
+  font-size: 0.72rem;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.notif-tag-coral {
+  color: var(--coral);
+}
+
+.notif-tag-amber {
+  color: var(--amber);
+}
+
+.notif-tag-blue {
+  color: var(--blue-600);
+}
+
+.notif-row {
+  display: grid;
+  gap: 2px;
+  padding: 9px 11px;
+  border-radius: var(--r-xs);
+  background: var(--surface-2);
+}
+
+.notif-row span {
+  font-weight: 550;
+  font-size: 0.88rem;
+}
+
+.notif-row small {
+  color: var(--muted);
+  font-size: 0.76rem;
+}
+
+/* ─── Link textual ───────────────────────────────────────── */
+
+.link-button {
+  align-self: center;
+  margin-top: 2px;
+  padding: 4px 8px;
+  background: none;
+  border: none;
+  color: var(--blue-600);
+  font-size: 0.85rem;
+  font-weight: 550;
+  text-decoration: underline;
+}
+
+.link-button:hover {
+  color: var(--blue-700);
 }

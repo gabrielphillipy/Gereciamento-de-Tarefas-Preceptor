@@ -3,8 +3,11 @@ import { createRoot } from "react-dom/client";
 import {
   AlertCircle,
   BarChart3,
+  Bell,
   CalendarDays,
   CheckCircle2,
+  ChevronLeft,
+  ChevronRight,
   Clock3,
   Download,
   Edit3,
@@ -31,6 +34,8 @@ type Status = "planejada" | "em-andamento" | "revisao" | "concluida";
 type Kind = "tarefa" | "reuniao" | "entrega";
 type ViewMode = "agenda" | "kanban";
 type NavSection = "agenda" | "kanban" | "equipe" | "indicadores" | "usuarios";
+type CalendarPeriod = "dia" | "semana" | "mes" | "ano";
+type MetricKey = "planejada" | "em-andamento" | "concluida" | "atrasada";
 
 type User = {
   id: string;
@@ -131,6 +136,7 @@ function App() {
   const [allUsers, setAllUsers] = useState<User[]>([]);
   const [items, setItems] = useState<WorkItem[]>([]);
   const [loading, setLoading] = useState(true);
+  const [recovery, setRecovery] = useState(false);
 
   const fetchItems = useCallback(async () => {
     const { data } = await supabase
@@ -171,12 +177,18 @@ function App() {
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((event, session) => {
+      if (event === "PASSWORD_RECOVERY") {
+        setRecovery(true);
+        setLoading(false);
+        return;
+      }
       if (session && (event === "SIGNED_IN" || event === "TOKEN_REFRESHED")) {
         loadUserAndData(session.user.id);
       } else if (event === "SIGNED_OUT") {
         setCurrentUser(null);
         setAllUsers([]);
         setItems([]);
+        setRecovery(false);
         setLoading(false);
       }
     });
@@ -221,6 +233,10 @@ function App() {
         <p>Carregando...</p>
       </div>
     );
+  }
+
+  if (recovery) {
+    return <ResetPassword />;
   }
 
   if (!currentUser) {
@@ -294,6 +310,26 @@ function Login() {
     setSubmitting(false);
   }
 
+  async function handleForgotPassword() {
+    if (!email.trim()) {
+      setError("Digite seu email no campo acima para receber o link.");
+      return;
+    }
+    setError("");
+    setInfo("");
+    setSubmitting(true);
+    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
+      email.trim(),
+      { redirectTo: window.location.origin }
+    );
+    setSubmitting(false);
+    if (resetError) {
+      setError(resetError.message);
+    } else {
+      setInfo("Enviamos um link de redefinição de senha para o seu email.");
+    }
+  }
+
   return (
     <main className="login-shell">
       <section className="login-panel">
@@ -347,6 +383,13 @@ function Login() {
             {error ? <p className="form-error">{error}</p> : null}
             <button className="primary-button" type="submit" disabled={submitting}>
               {submitting ? "Entrando..." : "Entrar"}
+            </button>
+            <button
+              type="button"
+              className="link-button"
+              onClick={handleForgotPassword}
+            >
+              Esqueci minha senha
             </button>
           </form>
         ) : (
@@ -426,6 +469,82 @@ function Login() {
   );
 }
 
+// ─── Redefinição de senha ─────────────────────────────────────
+
+function ResetPassword() {
+  const [password, setPassword] = useState("");
+  const [confirm, setConfirm] = useState("");
+  const [error, setError] = useState("");
+  const [done, setDone] = useState(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  async function handleSubmit(event: React.FormEvent) {
+    event.preventDefault();
+    setError("");
+    if (password !== confirm) {
+      setError("As senhas não coincidem.");
+      return;
+    }
+    setSubmitting(true);
+    const { error: updateError } = await supabase.auth.updateUser({ password });
+    if (updateError) {
+      setError(updateError.message);
+      setSubmitting(false);
+      return;
+    }
+    setDone(true);
+    setTimeout(() => {
+      supabase.auth.signOut();
+    }, 1800);
+  }
+
+  return (
+    <main className="login-shell">
+      <section className="login-panel">
+        <div className="brand-mark">
+          <span>P!</span>
+        </div>
+        <p className="eyebrow">Preceptor Tasks</p>
+        <h1>Definir nova senha</h1>
+        {done ? (
+          <p className="form-info">
+            Senha alterada com sucesso! Redirecionando para o login...
+          </p>
+        ) : (
+          <form className="login-form" onSubmit={handleSubmit}>
+            <label>
+              Nova senha
+              <input
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                placeholder="mínimo 6 caracteres"
+                type="password"
+                required
+                minLength={6}
+              />
+            </label>
+            <label>
+              Confirmar senha
+              <input
+                value={confirm}
+                onChange={(e) => setConfirm(e.target.value)}
+                placeholder="repita a nova senha"
+                type="password"
+                required
+                minLength={6}
+              />
+            </label>
+            {error ? <p className="form-error">{error}</p> : null}
+            <button className="primary-button" type="submit" disabled={submitting}>
+              {submitting ? "Salvando..." : "Salvar nova senha"}
+            </button>
+          </form>
+        )}
+      </section>
+    </main>
+  );
+}
+
 // ─── Dashboard ────────────────────────────────────────────────
 
 function Dashboard({
@@ -452,6 +571,9 @@ function Dashboard({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(today);
+  const [calPeriod, setCalPeriod] = useState<CalendarPeriod>("mes");
+  const [dayModal, setDayModal] = useState<string | null>(null);
+  const [metricModal, setMetricModal] = useState<MetricKey | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
@@ -471,6 +593,14 @@ function Dashboard({
   function showToast(message: string, tone: "error" | "success") {
     setToast({ message, tone });
   }
+
+  const myItems = useMemo(
+    () =>
+      items.filter((item) =>
+        currentUser.role === "gestor" ? true : item.ownerId === currentUser.id
+      ),
+    [items, currentUser]
+  );
 
   const visibleItems = useMemo(() => {
     return items
@@ -493,6 +623,20 @@ function Dashboard({
     pending: visibleItems.filter((item) => item.status !== "concluida").length,
     overdue: visibleItems.filter((item) => isOverdue(item)).length,
     deliveries: visibleItems.filter((item) => item.kind === "entrega").length,
+  };
+
+  const metricBuckets: Record<MetricKey, WorkItem[]> = {
+    planejada: visibleItems.filter((item) => item.status === "planejada"),
+    "em-andamento": visibleItems.filter((item) => item.status === "em-andamento"),
+    concluida: visibleItems.filter((item) => item.status === "concluida"),
+    atrasada: visibleItems.filter((item) => isOverdue(item)),
+  };
+
+  const metricLabel: Record<MetricKey, string> = {
+    planejada: "Planejadas",
+    "em-andamento": "Em andamento",
+    concluida: "Concluídas",
+    atrasada: "Atrasadas",
   };
 
   const nextDue = visibleItems.filter((item) => item.status !== "concluida").slice(0, 3);
@@ -707,6 +851,7 @@ function Dashboard({
                 placeholder="Buscar demanda, projeto ou responsável"
               />
             </div>
+            <NotificationCenter items={myItems} />
             {currentUser.role === "gestor" ? (
               <button className="primary-button" onClick={startNewDemand}>
                 <Plus size={18} />
@@ -719,38 +864,40 @@ function Dashboard({
         <section className="metrics">
           <Metric
             icon={<CalendarDays />}
-            label="Eventos no período"
-            value={metrics.total}
-            caption="Total"
-            ratio={1}
+            label="Planejadas"
+            value={metricBuckets.planejada.length}
+            caption="Ver lista"
+            ratio={metrics.total ? metricBuckets.planejada.length / metrics.total : 0}
+            onClick={() => setMetricModal("planejada")}
           />
           <Metric
             icon={<Clock3 />}
-            label="Demandas pendentes"
-            value={metrics.pending}
-            caption={
-              metrics.total
-                ? `${Math.round((metrics.pending / metrics.total) * 100)}% do total`
-                : "—"
+            label="Em andamento"
+            value={metricBuckets["em-andamento"].length}
+            caption="Ver lista"
+            ratio={
+              metrics.total ? metricBuckets["em-andamento"].length / metrics.total : 0
             }
-            ratio={metrics.total ? metrics.pending / metrics.total : 0}
             tone="amber"
-          />
-          <Metric
-            icon={<Megaphone />}
-            label="Demandas atrasadas"
-            value={metrics.overdue}
-            caption={metrics.overdue ? "Requer atenção" : "Em dia"}
-            ratio={metrics.total ? metrics.overdue / metrics.total : 0}
-            tone="coral"
+            onClick={() => setMetricModal("em-andamento")}
           />
           <Metric
             icon={<CheckCircle2 />}
-            label="Entregas filtradas"
-            value={metrics.deliveries}
-            caption="Entregas"
-            ratio={metrics.total ? metrics.deliveries / metrics.total : 0}
+            label="Concluídas"
+            value={metricBuckets.concluida.length}
+            caption="Ver lista"
+            ratio={metrics.total ? metricBuckets.concluida.length / metrics.total : 0}
             tone="green"
+            onClick={() => setMetricModal("concluida")}
+          />
+          <Metric
+            icon={<Megaphone />}
+            label="Atrasadas"
+            value={metricBuckets.atrasada.length}
+            caption="Ver lista"
+            ratio={metrics.total ? metricBuckets.atrasada.length / metrics.total : 0}
+            tone="coral"
+            onClick={() => setMetricModal("atrasada")}
           />
         </section>
 
@@ -832,18 +979,15 @@ function Dashboard({
                 <div>
                   <p className="eyebrow">{viewMode === "agenda" ? "Agenda" : "Kanban"}</p>
                   <h3>
-                    {viewMode === "agenda" ? "Próximos compromissos" : "Fluxo de trabalho"}
+                    {viewMode === "agenda"
+                      ? "Calendário de compromissos"
+                      : "Fluxo de trabalho"}
                   </h3>
                 </div>
                 <span className="save-hint">Salvo no banco de dados</span>
               </div>
 
-              {visibleItems.length === 0 ? (
-                <div className="empty-state">
-                  <strong>Nenhuma demanda encontrada</strong>
-                  <p>Ajuste os filtros ou crie uma nova atividade para a equipe.</p>
-                </div>
-              ) : viewMode === "agenda" ? (
+              {viewMode === "agenda" ? (
                 <CalendarView
                   items={visibleItems}
                   allUsers={allUsers}
@@ -853,7 +997,15 @@ function Dashboard({
                   onStatusChange={updateStatus}
                   onEdit={editItem}
                   onDelete={deleteItem}
+                  period={calPeriod}
+                  onPeriodChange={setCalPeriod}
+                  onOpenDay={setDayModal}
                 />
+              ) : visibleItems.length === 0 ? (
+                <div className="empty-state">
+                  <strong>Nenhuma demanda encontrada</strong>
+                  <p>Ajuste os filtros ou crie uma nova atividade para a equipe.</p>
+                </div>
               ) : (
                 <KanbanBoard
                   items={visibleItems}
@@ -1066,6 +1218,40 @@ function Dashboard({
           </div>
         ) : null}
       </section>
+
+      {dayModal ? (
+        <ItemsModal
+          subtitle="Compromissos do dia"
+          title={formatFull(dayModal)}
+          items={visibleItems.filter((item) => item.date === dayModal)}
+          allUsers={allUsers}
+          currentUser={currentUser}
+          onStatusChange={updateStatus}
+          onEdit={(item) => {
+            setDayModal(null);
+            editItem(item);
+          }}
+          onDelete={deleteItem}
+          onClose={() => setDayModal(null)}
+        />
+      ) : null}
+
+      {metricModal ? (
+        <ItemsModal
+          subtitle="Lista de tarefas"
+          title={metricLabel[metricModal]}
+          items={metricBuckets[metricModal]}
+          allUsers={allUsers}
+          currentUser={currentUser}
+          onStatusChange={updateStatus}
+          onEdit={(item) => {
+            setMetricModal(null);
+            editItem(item);
+          }}
+          onDelete={deleteItem}
+          onClose={() => setMetricModal(null)}
+        />
+      ) : null}
 
       {toast ? <Toast message={toast.message} tone={toast.tone} /> : null}
     </main>
@@ -1342,6 +1528,7 @@ function Metric({
   caption,
   ratio,
   tone,
+  onClick,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -1349,9 +1536,14 @@ function Metric({
   caption: string;
   ratio: number;
   tone?: "amber" | "coral" | "green";
+  onClick: () => void;
 }) {
   return (
-    <article className={`metric-card${tone ? ` tone-${tone}` : ""}`}>
+    <button
+      type="button"
+      className={`metric-card${tone ? ` tone-${tone}` : ""}`}
+      onClick={onClick}
+    >
       <div className="metric-top">
         <div className="metric-icon">{icon}</div>
         <span className="metric-trend">{caption}</span>
@@ -1361,7 +1553,7 @@ function Metric({
       <div className="metric-bar">
         <span style={{ width: `${Math.min(100, Math.round(ratio * 100))}%` }} />
       </div>
-    </article>
+    </button>
   );
 }
 
@@ -1380,6 +1572,81 @@ function Toast({
   );
 }
 
+function NotificationCenter({ items }: { items: WorkItem[] }) {
+  const [open, setOpen] = useState(false);
+
+  const overdue = items.filter((item) => isOverdue(item));
+  const dueToday = items.filter(
+    (item) => item.status !== "concluida" && item.date === today
+  );
+  const soonLimit = addDays(today, 3);
+  const dueSoon = items.filter(
+    (item) =>
+      item.status !== "concluida" && item.date > today && item.date <= soonLimit
+  );
+  const urgentCount = overdue.length + dueToday.length;
+
+  const groups = [
+    { label: "Atrasadas", tone: "coral", list: overdue },
+    { label: "Para hoje", tone: "amber", list: dueToday },
+    { label: "Próximos dias", tone: "blue", list: dueSoon },
+  ].filter((group) => group.list.length > 0);
+
+  return (
+    <div className="notif">
+      <button
+        className="notif-bell"
+        type="button"
+        onClick={() => setOpen((value) => !value)}
+        aria-label="Notificações"
+        title="Notificações"
+      >
+        <Bell size={18} />
+        {urgentCount > 0 ? <span className="notif-badge">{urgentCount}</span> : null}
+      </button>
+      {open ? (
+        <>
+          <div className="notif-backdrop" onClick={() => setOpen(false)} />
+          <div className="notif-panel" role="dialog" aria-label="Notificações">
+            <div className="notif-head">
+              <strong>Notificações</strong>
+              <button
+                className="ghost-button icon-button"
+                type="button"
+                onClick={() => setOpen(false)}
+                title="Fechar"
+              >
+                <X size={16} />
+              </button>
+            </div>
+            {groups.length === 0 ? (
+              <p className="muted-text notif-empty">
+                Nenhum prazo próximo. Tudo em dia.
+              </p>
+            ) : (
+              groups.map((group) => (
+                <div className="notif-group" key={group.label}>
+                  <span className={`notif-tag notif-tag-${group.tone}`}>
+                    {group.label} · {group.list.length}
+                  </span>
+                  {group.list.map((item) => (
+                    <div className="notif-row" key={item.id}>
+                      <span>{item.title}</span>
+                      <small>
+                        {formatDate(item.date)} às {item.time}
+                      </small>
+                    </div>
+                  ))}
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      ) : null}
+    </div>
+  );
+}
+
 function CalendarView({
   items,
   allUsers,
@@ -1389,6 +1656,9 @@ function CalendarView({
   onStatusChange,
   onEdit,
   onDelete,
+  period,
+  onPeriodChange,
+  onOpenDay,
 }: {
   items: WorkItem[];
   allUsers: User[];
@@ -1398,94 +1668,332 @@ function CalendarView({
   onStatusChange: (id: number, status: Status) => void;
   onEdit: (item: WorkItem) => void;
   onDelete: (id: number) => void;
+  period: CalendarPeriod;
+  onPeriodChange: (period: CalendarPeriod) => void;
+  onOpenDay: (date: string) => void;
 }) {
-  const referenceDate = items[0]?.date ?? selectedDate;
-  const monthDate = new Date(`${referenceDate}T00:00:00`);
-  const month = monthDate.getMonth();
-  const year = monthDate.getFullYear();
-  const days = buildCalendarDays(year, month);
+  const anchor = new Date(`${selectedDate}T00:00:00`);
+  const weekStart = startOfWeek(anchor);
   const itemsByDate = groupItemsByDate(items);
-  const selectedItems = itemsByDate[selectedDate] ?? [];
-  const monthLabel = monthDate.toLocaleDateString("pt-BR", {
-    month: "long",
-    year: "numeric",
-  });
+  const weekdays = ["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"];
+  const dayItems = itemsByDate[selectedDate] ?? [];
+
+  function shift(delta: number) {
+    const next = new Date(anchor);
+    if (period === "dia") next.setDate(next.getDate() + delta);
+    else if (period === "semana") next.setDate(next.getDate() + delta * 7);
+    else if (period === "mes") next.setMonth(next.getMonth() + delta);
+    else next.setFullYear(next.getFullYear() + delta);
+    onSelectDate(toDateInputValue(next));
+  }
+
+  let periodTitle: string;
+  if (period === "dia") {
+    periodTitle = anchor.toLocaleDateString("pt-BR", {
+      weekday: "long",
+      day: "2-digit",
+      month: "long",
+    });
+  } else if (period === "semana") {
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekStart.getDate() + 6);
+    periodTitle = `${weekStart.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+    })} – ${weekEnd.toLocaleDateString("pt-BR", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric",
+    })}`;
+  } else if (period === "mes") {
+    periodTitle = anchor.toLocaleDateString("pt-BR", {
+      month: "long",
+      year: "numeric",
+    });
+  } else {
+    periodTitle = String(anchor.getFullYear());
+  }
+
+  const periodOptions: Array<{ value: CalendarPeriod; label: string }> = [
+    { value: "dia", label: "Dia" },
+    { value: "semana", label: "Semana" },
+    { value: "mes", label: "Mês" },
+    { value: "ano", label: "Ano" },
+  ];
 
   return (
-    <div className="calendar-layout">
-      <div className="calendar-panel" aria-label="Calendário mensal">
-        <div className="calendar-toolbar">
-          <div>
-            <span>Calendário mensal</span>
-            <strong>{monthLabel}</strong>
-          </div>
-          <button className="ghost-button" onClick={() => onSelectDate(today)}>
+    <div className="calendar-shell">
+      <div className="cal-toolbar">
+        <div className="cal-nav">
+          <button
+            className="ghost-button icon-button"
+            type="button"
+            onClick={() => shift(-1)}
+            title="Anterior"
+          >
+            <ChevronLeft size={18} />
+          </button>
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => onSelectDate(today)}
+          >
             Hoje
           </button>
+          <button
+            className="ghost-button icon-button"
+            type="button"
+            onClick={() => shift(1)}
+            title="Próximo"
+          >
+            <ChevronRight size={18} />
+          </button>
+          <strong className="cal-title">{periodTitle}</strong>
         </div>
-        <div className="calendar-weekdays">
-          {["Dom", "Seg", "Ter", "Qua", "Qui", "Sex", "Sáb"].map((day) => (
-            <span key={day}>{day}</span>
+        <div className="cal-periods" aria-label="Período do calendário">
+          {periodOptions.map((option) => (
+            <button
+              key={option.value}
+              type="button"
+              className={period === option.value ? "selected" : ""}
+              onClick={() => onPeriodChange(option.value)}
+            >
+              {option.label}
+            </button>
           ))}
         </div>
-        <div className="calendar-grid">
-          {days.map((day) => {
-            const dateItems = itemsByDate[day.date] ?? [];
-            const isCurrentMonth = day.month === month;
-            const isSelected = day.date === selectedDate;
-            const isToday = day.date === today;
+      </div>
 
+      {period === "mes" ? (
+        <>
+          <div className="calendar-weekdays">
+            {weekdays.map((day) => (
+              <span key={day}>{day}</span>
+            ))}
+          </div>
+          <div className="calendar-grid">
+            {buildCalendarDays(anchor.getFullYear(), anchor.getMonth()).map((day) => {
+              const dateItems = itemsByDate[day.date] ?? [];
+              return (
+                <button
+                  className={`calendar-day ${
+                    day.month === anchor.getMonth() ? "" : "outside-month"
+                  } ${day.date === selectedDate ? "selected-day" : ""} ${
+                    day.date === today ? "is-today" : ""
+                  }`}
+                  key={day.date}
+                  type="button"
+                  onClick={() => {
+                    onSelectDate(day.date);
+                    onOpenDay(day.date);
+                  }}
+                >
+                  <span className="day-number">{day.label}</span>
+                  <div className="day-events">
+                    {dateItems.slice(0, 3).map((item) => (
+                      <span className={`event-dot event-${item.kind}`} key={item.id}>
+                        {item.title}
+                      </span>
+                    ))}
+                    {dateItems.length > 3 ? (
+                      <small>+{dateItems.length - 3}</small>
+                    ) : null}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </>
+      ) : period === "semana" ? (
+        <div className="week-grid">
+          {Array.from({ length: 7 }, (_, index) => {
+            const day = new Date(weekStart);
+            day.setDate(weekStart.getDate() + index);
+            const date = toDateInputValue(day);
+            const dateItems = itemsByDate[date] ?? [];
             return (
               <button
-                className={`calendar-day ${isCurrentMonth ? "" : "outside-month"} ${
-                  isSelected ? "selected-day" : ""
-                } ${isToday ? "is-today" : ""}`}
-                key={day.date}
-                onClick={() => onSelectDate(day.date)}
+                className={`week-col ${date === today ? "is-today" : ""} ${
+                  date === selectedDate ? "is-selected" : ""
+                }`}
+                key={date}
+                type="button"
+                onClick={() => {
+                  onSelectDate(date);
+                  onOpenDay(date);
+                }}
               >
-                <span className="day-number">{day.label}</span>
-                <div className="day-events">
-                  {dateItems.slice(0, 2).map((item) => (
-                    <span className={`event-dot event-${item.kind}`} key={item.id}>
-                      {item.title}
-                    </span>
-                  ))}
-                  {dateItems.length > 2 ? <small>+{dateItems.length - 2}</small> : null}
+                <div className="week-col-head">
+                  <span>{weekdays[day.getDay()]}</span>
+                  <strong className="day-number">{day.getDate()}</strong>
+                </div>
+                <div className="week-col-body">
+                  {dateItems.length ? (
+                    dateItems.map((item) => (
+                      <span className={`event-dot event-${item.kind}`} key={item.id}>
+                        {item.time} · {item.title}
+                      </span>
+                    ))
+                  ) : (
+                    <em>Sem compromissos</em>
+                  )}
                 </div>
               </button>
             );
           })}
         </div>
-      </div>
+      ) : period === "dia" ? (
+        <div className="day-view">
+          {dayItems.length ? (
+            <div className="day-list">
+              {dayItems.map((item) => (
+                <WorkCard
+                  key={item.id}
+                  item={item}
+                  allUsers={allUsers}
+                  compact
+                  canManage={currentUser.role === "gestor"}
+                  canEditStatus={
+                    currentUser.role === "gestor" || item.ownerId === currentUser.id
+                  }
+                  onStatusChange={onStatusChange}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="empty-day">
+              <strong>Nada agendado</strong>
+              <p>Nenhuma demanda neste dia. Use ‹ e › para navegar.</p>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="year-grid">
+          {Array.from({ length: 12 }, (_, monthIndex) => {
+            const monthName = new Date(
+              anchor.getFullYear(),
+              monthIndex,
+              1
+            ).toLocaleDateString("pt-BR", { month: "long" });
+            return (
+              <button
+                className="mini-month"
+                key={monthIndex}
+                type="button"
+                onClick={() => {
+                  onSelectDate(
+                    `${anchor.getFullYear()}-${String(monthIndex + 1).padStart(
+                      2,
+                      "0"
+                    )}-01`
+                  );
+                  onPeriodChange("mes");
+                }}
+              >
+                <strong>{monthName}</strong>
+                <div className="mini-weekdays">
+                  {["D", "S", "T", "Q", "Q", "S", "S"].map((letter, index) => (
+                    <span key={index}>{letter}</span>
+                  ))}
+                </div>
+                <div className="mini-grid">
+                  {buildCalendarDays(anchor.getFullYear(), monthIndex).map((day) => {
+                    const hasItems = (itemsByDate[day.date]?.length ?? 0) > 0;
+                    return (
+                      <span
+                        className={`mini-day ${
+                          day.month === monthIndex ? "" : "mini-out"
+                        } ${hasItems ? "mini-has" : ""} ${
+                          day.date === today ? "mini-today" : ""
+                        }`}
+                        key={day.date}
+                      >
+                        {day.label}
+                      </span>
+                    );
+                  })}
+                </div>
+              </button>
+            );
+          })}
+        </div>
+      )}
+    </div>
+  );
+}
 
-      <aside className="day-detail">
-        <p className="eyebrow">Dia selecionado</p>
-        <h3>{formatDate(selectedDate)}</h3>
-        {selectedItems.length ? (
-          <div className="day-list">
-            {selectedItems.map((item) => (
-              <WorkCard
-                key={item.id}
-                item={item}
-                allUsers={allUsers}
-                compact
-                canManage={currentUser.role === "gestor"}
-                canEditStatus={
-                  currentUser.role === "gestor" || item.ownerId === currentUser.id
-                }
-                onStatusChange={onStatusChange}
-                onEdit={onEdit}
-                onDelete={onDelete}
-              />
-            ))}
+function ItemsModal({
+  title,
+  subtitle,
+  items,
+  allUsers,
+  currentUser,
+  onStatusChange,
+  onEdit,
+  onDelete,
+  onClose,
+}: {
+  title: string;
+  subtitle: string;
+  items: WorkItem[];
+  allUsers: User[];
+  currentUser: User;
+  onStatusChange: (id: number, status: Status) => void;
+  onEdit: (item: WorkItem) => void;
+  onDelete: (id: number) => void;
+  onClose: () => void;
+}) {
+  return (
+    <div className="modal-backdrop" role="presentation" onClick={onClose}>
+      <div
+        className="modal-card"
+        role="dialog"
+        aria-modal="true"
+        onClick={(event) => event.stopPropagation()}
+      >
+        <div className="modal-head">
+          <div>
+            <p className="eyebrow">{subtitle}</p>
+            <h3>{title}</h3>
           </div>
-        ) : (
-          <div className="empty-day">
-            <strong>Nada agendado</strong>
-            <p>Nenhuma demanda filtrada para este dia.</p>
-          </div>
-        )}
-      </aside>
+          <button
+            className="ghost-button icon-button"
+            type="button"
+            onClick={onClose}
+            title="Fechar"
+          >
+            <X size={18} />
+          </button>
+        </div>
+        <div className="modal-body">
+          {items.length ? (
+            <div className="day-list">
+              {items.map((item) => (
+                <WorkCard
+                  key={item.id}
+                  item={item}
+                  allUsers={allUsers}
+                  compact
+                  canManage={currentUser.role === "gestor"}
+                  canEditStatus={
+                    currentUser.role === "gestor" || item.ownerId === currentUser.id
+                  }
+                  onStatusChange={onStatusChange}
+                  onEdit={onEdit}
+                  onDelete={onDelete}
+                />
+              ))}
+            </div>
+          ) : (
+            <div className="empty-day">
+              <strong>Nada por aqui</strong>
+              <p>Nenhuma demanda nesta lista.</p>
+            </div>
+          )}
+        </div>
+      </div>
     </div>
   );
 }
@@ -1685,6 +2193,22 @@ function initials(name: string) {
   );
 }
 
+function startOfWeek(date: Date) {
+  const result = new Date(date);
+  result.setDate(result.getDate() - result.getDay());
+  result.setHours(0, 0, 0, 0);
+  return result;
+}
+
+function formatFull(date: string) {
+  return new Date(`${date}T00:00:00`).toLocaleDateString("pt-BR", {
+    weekday: "long",
+    day: "2-digit",
+    month: "long",
+    year: "numeric",
+  });
+}
+
 function groupItemsByDate(items: WorkItem[]) {
   return items.reduce<Record<string, WorkItem[]>>((acc, item) => {
     acc[item.date] = [...(acc[item.date] ?? []), item].sort((a, b) =>
@@ -1711,6 +2235,12 @@ function toDateInputValue(date: Date) {
   const month = String(date.getMonth() + 1).padStart(2, "0");
   const day = String(date.getDate()).padStart(2, "0");
   return `${year}-${month}-${day}`;
+}
+
+function addDays(date: string, days: number) {
+  const result = new Date(`${date}T00:00:00`);
+  result.setDate(result.getDate() + days);
+  return toDateInputValue(result);
 }
 
 function isOverdue(item: WorkItem) {
