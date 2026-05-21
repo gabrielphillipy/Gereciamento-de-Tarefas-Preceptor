@@ -1016,7 +1016,6 @@ nav button.active::before {
 }
 
 .agenda-panel,
-.team-panel,
 .management-panel,
 .calendar-panel,
 .day-detail {
@@ -1485,114 +1484,6 @@ nav button.active::before {
 .icon-actions .icon-button {
   width: 40px;
   min-height: 40px;
-}
-
-/* ─── Painel lateral ──────────────────────────────────────── */
-
-.side-panel {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 18px;
-  align-items: start;
-}
-
-.team-panel {
-  display: grid;
-  gap: 13px;
-  padding: 20px;
-}
-
-.team-panel h3 {
-  margin: 0;
-  font-size: 1.12rem;
-}
-
-.action-panel {
-  align-content: start;
-  background: linear-gradient(165deg, var(--navy-800), var(--navy-900));
-  border-color: var(--navy-700);
-  color: var(--on-navy);
-  box-shadow: var(--shadow-lg);
-}
-
-.action-panel .eyebrow {
-  color: var(--blue-300);
-}
-
-.action-panel .eyebrow::before {
-  background: var(--blue-300);
-}
-
-.action-panel h3 {
-  color: #ffffff;
-}
-
-.action-panel .muted-text {
-  color: var(--on-navy-soft);
-}
-
-.action-panel .primary-button {
-  width: 100%;
-  margin-top: 4px;
-}
-
-.collaborator-note {
-  background: linear-gradient(165deg, var(--blue-50), var(--surface));
-  border-color: var(--blue-100);
-}
-
-.collaborator-note p:last-child {
-  margin: 0;
-  color: var(--ink-soft);
-  font-size: 0.9rem;
-  line-height: 1.6;
-}
-
-.team-row {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: 12px;
-  min-height: 50px;
-  padding: 0 15px;
-  border-radius: var(--r-sm);
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  font-weight: 550;
-  font-size: 0.88rem;
-  transition: border-color 0.16s var(--ease), background 0.16s var(--ease);
-}
-
-.team-row:hover {
-  border-color: var(--blue-200);
-  background: var(--blue-50);
-}
-
-.team-row small {
-  color: var(--muted);
-  font-weight: 500;
-}
-
-.alert-row {
-  display: grid;
-  gap: 3px;
-  padding: 13px 15px;
-  border-radius: var(--r-sm);
-  background: var(--surface-2);
-  border: 1px solid var(--line);
-  border-left: 3px solid var(--amber);
-}
-
-.alert-row span {
-  font-weight: 600;
-  font-size: 0.88rem;
-  color: var(--ink);
-}
-
-.alert-row small {
-  color: var(--muted);
-  font-weight: 500;
-  font-size: 0.78rem;
 }
 
 /* ─── Kanban ──────────────────────────────────────────────── */
@@ -2412,9 +2303,6 @@ nav button.active::before {
   .insights-grid,
   .report-grid {
     grid-template-columns: repeat(2, 1fr);
-  }
-  .side-panel {
-    grid-template-columns: 1fr;
   }
   .year-grid {
     grid-template-columns: repeat(2, 1fr);

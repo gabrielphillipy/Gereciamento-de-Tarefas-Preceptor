@@ -639,8 +639,6 @@ function Dashboard({
     atrasada: "Atrasadas",
   };
 
-  const nextDue = visibleItems.filter((item) => item.status !== "concluida").slice(0, 3);
-
   const visibleTeamUsers = colaboradores.filter((user) => {
     if (currentUser.role === "colaborador" && user.id !== currentUser.id) return false;
     if (ownerFilter !== "todos" && user.id !== ownerFilter) return false;
@@ -1019,63 +1017,6 @@ function Dashboard({
                   onDelete={deleteItem}
                 />
               )}
-            </div>
-
-            <div className="side-panel">
-              {currentUser.role === "gestor" ? (
-                <div className="team-panel action-panel">
-                  <p className="eyebrow">Gestor</p>
-                  <h3>Demandas</h3>
-                  <p className="muted-text">
-                    Crie tarefas, reuniões e entregas pelo botão principal.
-                  </p>
-                  <button className="primary-button" onClick={startNewDemand}>
-                    <Plus size={18} />
-                    Criar demanda
-                  </button>
-                </div>
-              ) : (
-                <div className="team-panel collaborator-note">
-                  <p className="eyebrow">Colaborador</p>
-                  <h3>Minha fila</h3>
-                  <p>
-                    Acompanhe suas tarefas, reuniões e entregas. Atualize o status quando avançar
-                    para manter o gestor alinhado.
-                  </p>
-                </div>
-              )}
-
-              <div className="team-panel">
-                <p className="eyebrow">Alertas</p>
-                <h3>Próximos prazos</h3>
-                {nextDue.length ? (
-                  nextDue.map((item) => (
-                    <div className="alert-row" key={item.id}>
-                      <span>{item.title}</span>
-                      <small>
-                        {formatDate(item.date)} às {item.time}
-                      </small>
-                    </div>
-                  ))
-                ) : (
-                  <p className="muted-text">Nada pendente nos filtros atuais.</p>
-                )}
-              </div>
-
-              <div className="team-panel" id="equipe">
-                <p className="eyebrow">Equipe</p>
-                <h3>Colaboradores</h3>
-                {colaboradores.length === 0 ? (
-                  <p className="muted-text">Nenhum colaborador cadastrado ainda.</p>
-                ) : (
-                  colaboradores.map((user) => (
-                    <div className="team-row" key={user.id}>
-                      <span>{user.name}</span>
-                      <small>{user.team}</small>
-                    </div>
-                  ))
-                )}
-              </div>
             </div>
           </section>
         )}
