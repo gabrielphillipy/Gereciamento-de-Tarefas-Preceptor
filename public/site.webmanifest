@@ -1,0 +1,18 @@
+{
+  "name": "Preceptor Tasks",
+  "short_name": "Preceptor",
+  "description": "Gestão de tarefas, agenda e entregas da equipe da Preceptor.",
+  "lang": "pt-BR",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#eef1fa",
+  "theme_color": "#1f5eff",
+  "icons": [
+    {
+      "src": "/favicon.svg",
+      "type": "image/svg+xml",
+      "sizes": "any",
+      "purpose": "any"
+    }
+  ]
+}

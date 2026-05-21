@@ -2261,6 +2261,45 @@ nav button.active::before {
   gap: 11px;
 }
 
+/* ─── Tela de erro ────────────────────────────────────────── */
+
+.error-screen {
+  min-height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 32px;
+  text-align: center;
+  color: var(--ink-soft);
+}
+
+.error-screen h1 {
+  margin: 6px 0 0;
+  font-size: clamp(1.6rem, 3vw, 2.2rem);
+}
+
+.error-screen p {
+  margin: 0;
+  color: var(--muted);
+}
+
+.error-screen code {
+  max-width: 520px;
+  padding: 10px 14px;
+  border-radius: var(--r-sm);
+  background: var(--coral-bg);
+  border: 1px solid #efc7c3;
+  color: #b3392f;
+  font-size: 0.82rem;
+  word-break: break-word;
+}
+
+.error-screen .primary-button {
+  margin-top: 8px;
+}
+
 /* ─── Responsivo ──────────────────────────────────────────── */
 
 @media (max-width: 1140px) {
