@@ -2031,6 +2031,35 @@ nav button.active::before {
   }
 }
 
+/* ─── Kanban: arrastar-e-soltar ──────────────────────────── */
+
+.kanban-draggable {
+  cursor: grab;
+}
+
+.kanban-draggable:active {
+  cursor: grabbing;
+}
+
+.kanban-draggable.dragging {
+  opacity: 0.45;
+}
+
+.kanban-column.drag-over {
+  outline: 2px dashed var(--blue-400);
+  outline-offset: -3px;
+  background: var(--blue-50);
+}
+
+/* ─── Ações de cabeçalho ─────────────────────────────────── */
+
+.heading-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,

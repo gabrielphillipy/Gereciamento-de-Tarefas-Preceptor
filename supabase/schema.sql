@@ -145,6 +145,59 @@ begin
   end if;
 end $$;
 
+-- ─── Proteção de colunas sensíveis ──────────────────────────
+-- O RLS controla LINHAS, não COLUNAS. Estes triggers garantem que:
+--  • só um gestor altera o campo `role` de um perfil;
+--  • colaborador só altera o `status` das próprias demandas.
+
+create or replace function public.guard_profile_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if new.role is distinct from old.role and not public.is_gestor() then
+    raise exception 'Apenas gestores podem alterar o cargo de um usuário.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists profiles_guard on public.profiles;
+create trigger profiles_guard
+  before update on public.profiles
+  for each row execute function public.guard_profile_update();
+
+create or replace function public.guard_work_item_update()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  if public.is_gestor() then
+    return new;
+  end if;
+  if new.title    is distinct from old.title
+  or new.owner_id is distinct from old.owner_id
+  or new.kind     is distinct from old.kind
+  or new.date     is distinct from old.date
+  or new.time     is distinct from old.time
+  or new.priority is distinct from old.priority
+  or new.project  is distinct from old.project
+  or new.notes    is distinct from old.notes then
+    raise exception 'Colaboradores só podem alterar o status da demanda.';
+  end if;
+  return new;
+end;
+$$;
+
+drop trigger if exists work_items_guard on public.work_items;
+create trigger work_items_guard
+  before update on public.work_items
+  for each row execute function public.guard_work_item_update();
+
 -- ─── NOTA ────────────────────────────────────────────────────
 -- Para facilitar testes, desative a confirmação de e-mail em:
 -- Supabase Dashboard → Authentication → Providers → Email

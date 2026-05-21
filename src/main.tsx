@@ -6,6 +6,7 @@ import {
   CalendarDays,
   CheckCircle2,
   Clock3,
+  Download,
   Edit3,
   KanbanSquare,
   LogOut,
@@ -816,6 +817,7 @@ function Dashboard({
             metrics={metrics}
             statusStats={statusStats}
             visibleItems={visibleItems}
+            allUsers={allUsers}
           />
         ) : activeNav === "usuarios" && currentUser.role === "gestor" ? (
           <UsersAdminPage
@@ -1150,10 +1152,12 @@ function IndicatorsPage({
   metrics,
   statusStats,
   visibleItems,
+  allUsers,
 }: {
   metrics: { total: number; pending: number; overdue: number; deliveries: number };
   statusStats: Array<{ status: Status; total: number }>;
   visibleItems: WorkItem[];
+  allUsers: User[];
 }) {
   const completionRate =
     metrics.total === 0
@@ -1169,7 +1173,19 @@ function IndicatorsPage({
           <p className="eyebrow">Indicadores</p>
           <h3>Resumo operacional</h3>
         </div>
-        <span className="save-hint">{completionRate}% concluídas</span>
+        <div className="heading-actions">
+          <span className="save-hint">{completionRate}% concluídas</span>
+          <button
+            className="ghost-button"
+            type="button"
+            onClick={() => exportCsv(visibleItems, allUsers)}
+            disabled={visibleItems.length === 0}
+            title="Exportar as demandas filtradas em CSV"
+          >
+            <Download size={16} />
+            Exportar CSV
+          </button>
+        </div>
       </div>
       <div className="insights-grid">
         {statusStats.map(({ status, total }) => (
@@ -1490,33 +1506,69 @@ function KanbanBoard({
   onDelete: (id: number) => void;
 }) {
   const columns: Status[] = ["planejada", "em-andamento", "revisao", "concluida"];
+  const [draggingId, setDraggingId] = useState<number | null>(null);
+  const [dragOver, setDragOver] = useState<Status | null>(null);
+
+  function handleDrop(status: Status) {
+    const dragged = items.find((item) => item.id === draggingId);
+    if (dragged && dragged.status !== status) {
+      onStatusChange(dragged.id, status);
+    }
+    setDraggingId(null);
+    setDragOver(null);
+  }
 
   return (
     <div className="kanban-board">
       {columns.map((status) => {
         const columnItems = items.filter((item) => item.status === status);
         return (
-          <section className="kanban-column" key={status}>
+          <section
+            className={`kanban-column${dragOver === status ? " drag-over" : ""}`}
+            key={status}
+            onDragOver={(event) => {
+              if (draggingId === null) return;
+              event.preventDefault();
+              setDragOver(status);
+            }}
+            onDrop={() => handleDrop(status)}
+          >
             <div className="kanban-heading">
               <strong>{statusLabel[status]}</strong>
               <span>{columnItems.length}</span>
             </div>
             <div className="kanban-list">
-              {columnItems.map((item) => (
-                <WorkCard
-                  key={item.id}
-                  item={item}
-                  allUsers={allUsers}
-                  compact
-                  canManage={currentUser.role === "gestor"}
-                  canEditStatus={
-                    currentUser.role === "gestor" || item.ownerId === currentUser.id
-                  }
-                  onStatusChange={onStatusChange}
-                  onEdit={onEdit}
-                  onDelete={onDelete}
-                />
-              ))}
+              {columnItems.map((item) => {
+                const draggable =
+                  currentUser.role === "gestor" || item.ownerId === currentUser.id;
+                return (
+                  <div
+                    key={item.id}
+                    className={`kanban-draggable${
+                      draggingId === item.id ? " dragging" : ""
+                    }`}
+                    draggable={draggable}
+                    onDragStart={() => setDraggingId(item.id)}
+                    onDragEnd={() => {
+                      setDraggingId(null);
+                      setDragOver(null);
+                    }}
+                  >
+                    <WorkCard
+                      item={item}
+                      allUsers={allUsers}
+                      compact
+                      canManage={currentUser.role === "gestor"}
+                      canEditStatus={
+                        currentUser.role === "gestor" || item.ownerId === currentUser.id
+                      }
+                      onStatusChange={onStatusChange}
+                      onEdit={onEdit}
+                      onDelete={onDelete}
+                    />
+                  </div>
+                );
+              })}
             </div>
           </section>
         );
@@ -1663,6 +1715,45 @@ function toDateInputValue(date: Date) {
 
 function isOverdue(item: WorkItem) {
   return item.status !== "concluida" && item.date < today;
+}
+
+function exportCsv(items: WorkItem[], users: User[]) {
+  const headers = [
+    "Titulo",
+    "Responsavel",
+    "Tipo",
+    "Status",
+    "Prioridade",
+    "Data",
+    "Hora",
+    "Projeto",
+    "Observacoes",
+  ];
+  const rows = items.map((item) => {
+    const owner = users.find((u) => u.id === item.ownerId)?.name ?? "";
+    return [
+      item.title,
+      owner,
+      kindLabel[item.kind],
+      statusLabel[item.status],
+      priorityLabel[item.priority],
+      item.date,
+      item.time,
+      item.project,
+      item.notes,
+    ];
+  });
+  const escape = (value: string) => `"${String(value).replace(/"/g, '""')}"`;
+  const csv = [headers, ...rows]
+    .map((row) => row.map(escape).join(","))
+    .join("\r\n");
+  const blob = new Blob(["﻿" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `preceptor-tasks-${today}.csv`;
+  link.click();
+  URL.revokeObjectURL(url);
 }
 
 // ─── Mount ───────────────────────────────────────────────────
