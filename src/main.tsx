@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useMemo, useState } from "react";
 import { createRoot } from "react-dom/client";
 import {
+  AlertCircle,
   BarChart3,
   CalendarDays,
   CheckCircle2,
@@ -182,6 +183,30 @@ function App() {
     return () => subscription.unsubscribe();
   }, [loadUserAndData]);
 
+  useEffect(() => {
+    if (!currentUser) return;
+    const channel = supabase
+      .channel("preceptor-changes")
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "work_items" },
+        () => {
+          fetchItems();
+        }
+      )
+      .on(
+        "postgres_changes",
+        { event: "*", schema: "public", table: "profiles" },
+        () => {
+          fetchUsers();
+        }
+      )
+      .subscribe();
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [currentUser, fetchItems, fetchUsers]);
+
   async function logout() {
     await supabase.auth.signOut();
   }
@@ -251,6 +276,7 @@ function Login() {
     const { data: authData, error: authError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
+      options: { data: { name: name.trim(), team: team.trim() } },
     });
 
     if (authError) {
@@ -259,28 +285,8 @@ function Login() {
       return;
     }
 
-    if (!authData.user) {
-      setError("Erro ao criar conta.");
-      setSubmitting(false);
-      return;
-    }
-
-    const { error: profileError } = await supabase.from("profiles").insert({
-      id: authData.user.id,
-      name: name.trim(),
-      email: email.trim(),
-      role: "colaborador",
-      team: team.trim(),
-    });
-
-    if (profileError) {
-      setError("Conta criada, mas erro ao salvar perfil: " + profileError.message);
-      setSubmitting(false);
-      return;
-    }
-
     if (!authData.session) {
-      setInfo("Conta criada! Verifique seu email para confirmar e depois faca login.");
+      setInfo("Conta criada! Verifique seu email para confirmar e depois faça login.");
       switchMode("login");
     }
 
@@ -446,10 +452,24 @@ function Dashboard({
   const [composerOpen, setComposerOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(today);
   const [saving, setSaving] = useState(false);
+  const [toast, setToast] = useState<{
+    message: string;
+    tone: "error" | "success";
+  } | null>(null);
 
   const colaboradores = allUsers.filter((u) => u.role === "colaborador");
   const firstColabId = colaboradores[0]?.id ?? "";
   const [form, setForm] = useState<WorkForm>(() => makeEmptyForm(firstColabId));
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 4000);
+    return () => clearTimeout(timer);
+  }, [toast]);
+
+  function showToast(message: string, tone: "error" | "success") {
+    setToast({ message, tone });
+  }
 
   const visibleItems = useMemo(() => {
     return items
@@ -526,27 +546,36 @@ function Dashboard({
       updated_at: timestamp,
     };
 
-    if (editingId) {
-      await supabase
-        .from("work_items")
-        .update({ ...payload, status: form.status })
-        .eq("id", editingId);
-    } else {
-      await supabase
-        .from("work_items")
-        .insert({ ...payload, status: "planejada", created_at: timestamp });
+    const { error } = editingId
+      ? await supabase
+          .from("work_items")
+          .update({ ...payload, status: form.status })
+          .eq("id", editingId)
+      : await supabase
+          .from("work_items")
+          .insert({ ...payload, status: "planejada", created_at: timestamp });
+
+    setSaving(false);
+
+    if (error) {
+      showToast("Não foi possível salvar a demanda. Tente novamente.", "error");
+      return;
     }
 
     await onRefresh();
-    setSaving(false);
+    showToast(editingId ? "Demanda atualizada." : "Demanda criada.", "success");
     resetForm();
   }
 
   async function updateStatus(id: number, status: Status) {
-    await supabase
+    const { error } = await supabase
       .from("work_items")
       .update({ status, updated_at: new Date().toISOString() })
       .eq("id", id);
+    if (error) {
+      showToast("Não foi possível atualizar o status.", "error");
+      return;
+    }
     await onRefresh();
   }
 
@@ -570,8 +599,13 @@ function Dashboard({
     const item = items.find((current) => current.id === id);
     if (!item) return;
     if (!window.confirm(`Excluir a demanda "${item.title}"?`)) return;
-    await supabase.from("work_items").delete().eq("id", id);
+    const { error } = await supabase.from("work_items").delete().eq("id", id);
+    if (error) {
+      showToast("Não foi possível excluir a demanda.", "error");
+      return;
+    }
     await onRefresh();
+    showToast("Demanda excluída.", "success");
     if (editingId === id) resetForm();
   }
 
@@ -594,11 +628,12 @@ function Dashboard({
             <span>P!</span>
           </div>
           <div>
-            <span>Preceptor</span>
+            Preceptor
             <small>Operations Hub</small>
           </div>
         </div>
         <nav>
+          <p className="nav-group">Operação</p>
           <button
             className={activeNav === "agenda" ? "active" : ""}
             onClick={() => navigate("agenda")}
@@ -613,6 +648,7 @@ function Dashboard({
             <KanbanSquare size={18} />
             Kanban
           </button>
+          <p className="nav-group">Gestão</p>
           <button
             className={activeNav === "equipe" ? "active" : ""}
             onClick={() => navigate("equipe")}
@@ -637,51 +673,87 @@ function Dashboard({
             </button>
           ) : null}
         </nav>
-        <button className="ghost-button" onClick={onLogout}>
-          <LogOut size={18} />
-          Sair
-        </button>
+        <div className="side-footer">
+          <div className="side-user">
+            <div className="side-avatar">{initials(currentUser.name)}</div>
+            <div>
+              <strong>{currentUser.name}</strong>
+              <small>{currentUser.role}</small>
+            </div>
+          </div>
+          <button className="ghost-button" onClick={onLogout}>
+            <LogOut size={18} />
+            Sair
+          </button>
+        </div>
       </aside>
 
       <section className="workspace">
         <header className="topbar">
-          <div>
+          <div className="topbar-head">
             <p className="eyebrow">Painel {currentUser.role}</p>
             <h2>Central de operação</h2>
             <p className="topbar-subtitle">
               Priorize demandas, acompanhe prazos e mantenha a equipe alinhada.
             </p>
           </div>
-          <div className="topbar-actions">
+          <div className="topbar-tools">
+            <div className="search-box">
+              <Search size={18} />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                placeholder="Buscar demanda, projeto ou responsável"
+              />
+            </div>
             {currentUser.role === "gestor" ? (
               <button className="primary-button" onClick={startNewDemand}>
                 <Plus size={18} />
                 Nova demanda
               </button>
             ) : null}
-            <div className="user-chip">
-              <UserRound size={18} />
-              <span>{currentUser.name}</span>
-            </div>
           </div>
         </header>
 
         <section className="metrics">
-          <Metric icon={<CalendarDays />} label="Eventos" value={metrics.total} />
-          <Metric icon={<Clock3 />} label="Pendências" value={metrics.pending} />
-          <Metric icon={<Megaphone />} label="Atrasadas" value={metrics.overdue} />
-          <Metric icon={<CheckCircle2 />} label="Entregas" value={metrics.deliveries} />
+          <Metric
+            icon={<CalendarDays />}
+            label="Eventos no período"
+            value={metrics.total}
+            caption="Total"
+            ratio={1}
+          />
+          <Metric
+            icon={<Clock3 />}
+            label="Demandas pendentes"
+            value={metrics.pending}
+            caption={
+              metrics.total
+                ? `${Math.round((metrics.pending / metrics.total) * 100)}% do total`
+                : "—"
+            }
+            ratio={metrics.total ? metrics.pending / metrics.total : 0}
+            tone="amber"
+          />
+          <Metric
+            icon={<Megaphone />}
+            label="Demandas atrasadas"
+            value={metrics.overdue}
+            caption={metrics.overdue ? "Requer atenção" : "Em dia"}
+            ratio={metrics.total ? metrics.overdue / metrics.total : 0}
+            tone="coral"
+          />
+          <Metric
+            icon={<CheckCircle2 />}
+            label="Entregas filtradas"
+            value={metrics.deliveries}
+            caption="Entregas"
+            ratio={metrics.total ? metrics.deliveries / metrics.total : 0}
+            tone="green"
+          />
         </section>
 
-        <section className="control-row">
-          <div className="search-box">
-            <Search size={18} />
-            <input
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder="Buscar tarefa, projeto, observação ou responsável"
-            />
-          </div>
+        <section className="toolbar">
           <div className="view-toggle" aria-label="Alternar visualizacao">
             <button
               className={viewMode === "agenda" ? "selected" : ""}
@@ -698,44 +770,43 @@ function Dashboard({
               Kanban
             </button>
           </div>
-        </section>
-
-        <section className="filters-row">
-          <select
-            aria-label="Filtro de status"
-            value={statusFilter}
-            onChange={(event) => setStatusFilter(event.target.value as Status | "todos")}
-          >
-            <option value="todos">Todos os status</option>
-            <option value="planejada">Planejada</option>
-            <option value="em-andamento">Em andamento</option>
-            <option value="revisao">Revisão</option>
-            <option value="concluida">Concluída</option>
-          </select>
-          <select
-            aria-label="Filtro de tipo"
-            value={kindFilter}
-            onChange={(event) => setKindFilter(event.target.value as Kind | "todos")}
-          >
-            <option value="todos">Todos os tipos</option>
-            <option value="tarefa">Tarefa</option>
-            <option value="reuniao">Reunião</option>
-            <option value="entrega">Entrega</option>
-          </select>
-          {currentUser.role === "gestor" ? (
+          <div className="filters">
             <select
-              aria-label="Filtro de responsavel"
-              value={ownerFilter}
-              onChange={(event) => setOwnerFilter(event.target.value)}
+              aria-label="Filtro de status"
+              value={statusFilter}
+              onChange={(event) => setStatusFilter(event.target.value as Status | "todos")}
             >
-              <option value="todos">Todos os responsáveis</option>
-              {colaboradores.map((user) => (
-                <option key={user.id} value={user.id}>
-                  {user.name}
-                </option>
-              ))}
+              <option value="todos">Todos os status</option>
+              <option value="planejada">Planejada</option>
+              <option value="em-andamento">Em andamento</option>
+              <option value="revisao">Revisão</option>
+              <option value="concluida">Concluída</option>
             </select>
-          ) : null}
+            <select
+              aria-label="Filtro de tipo"
+              value={kindFilter}
+              onChange={(event) => setKindFilter(event.target.value as Kind | "todos")}
+            >
+              <option value="todos">Todos os tipos</option>
+              <option value="tarefa">Tarefa</option>
+              <option value="reuniao">Reunião</option>
+              <option value="entrega">Entrega</option>
+            </select>
+            {currentUser.role === "gestor" ? (
+              <select
+                aria-label="Filtro de responsavel"
+                value={ownerFilter}
+                onChange={(event) => setOwnerFilter(event.target.value)}
+              >
+                <option value="todos">Todos os responsáveis</option>
+                {colaboradores.map((user) => (
+                  <option key={user.id} value={user.id}>
+                    {user.name}
+                  </option>
+                ))}
+              </select>
+            ) : null}
+          </div>
         </section>
 
         {activeNav === "equipe" ? (
@@ -993,6 +1064,8 @@ function Dashboard({
           </div>
         ) : null}
       </section>
+
+      {toast ? <Toast message={toast.message} tone={toast.tone} /> : null}
     </main>
   );
 }
@@ -1250,17 +1323,44 @@ function Metric({
   icon,
   label,
   value,
+  caption,
+  ratio,
+  tone,
 }: {
   icon: React.ReactNode;
   label: string;
   value: number;
+  caption: string;
+  ratio: number;
+  tone?: "amber" | "coral" | "green";
 }) {
   return (
-    <article className="metric-card">
-      <div className="metric-icon">{icon}</div>
-      <span>{label}</span>
+    <article className={`metric-card${tone ? ` tone-${tone}` : ""}`}>
+      <div className="metric-top">
+        <div className="metric-icon">{icon}</div>
+        <span className="metric-trend">{caption}</span>
+      </div>
       <strong>{value}</strong>
+      <span className="metric-label">{label}</span>
+      <div className="metric-bar">
+        <span style={{ width: `${Math.min(100, Math.round(ratio * 100))}%` }} />
+      </div>
     </article>
+  );
+}
+
+function Toast({
+  message,
+  tone,
+}: {
+  message: string;
+  tone: "error" | "success";
+}) {
+  return (
+    <div className={`toast toast-${tone}`} role="status" aria-live="polite">
+      {tone === "error" ? <AlertCircle size={18} /> : <CheckCircle2 size={18} />}
+      <span>{message}</span>
+    </div>
   );
 }
 
@@ -1317,12 +1417,13 @@ function CalendarView({
             const dateItems = itemsByDate[day.date] ?? [];
             const isCurrentMonth = day.month === month;
             const isSelected = day.date === selectedDate;
+            const isToday = day.date === today;
 
             return (
               <button
                 className={`calendar-day ${isCurrentMonth ? "" : "outside-month"} ${
                   isSelected ? "selected-day" : ""
-                }`}
+                } ${isToday ? "is-today" : ""}`}
                 key={day.date}
                 onClick={() => onSelectDate(day.date)}
               >
@@ -1519,6 +1620,17 @@ function formatDate(date: string, short = false) {
     month: short ? "short" : "2-digit",
     year: short ? undefined : "numeric",
   });
+}
+
+function initials(name: string) {
+  return (
+    name
+      .trim()
+      .split(/\s+/)
+      .slice(0, 2)
+      .map((part) => part[0]?.toUpperCase() ?? "")
+      .join("") || "?"
+  );
 }
 
 function groupItemsByDate(items: WorkItem[]) {

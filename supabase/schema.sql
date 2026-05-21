@@ -93,7 +93,63 @@ create trigger work_items_updated_at
   before update on public.work_items
   for each row execute function public.set_updated_at();
 
+-- ─── Criação automática de perfil ao cadastrar ──────────────
+-- O perfil é criado pelo banco (não pelo cliente), lendo nome e
+-- equipe do metadata enviado no signUp. O PRIMEIRO usuário a se
+-- cadastrar vira 'gestor'; os demais entram como 'colaborador'.
+create or replace function public.handle_new_user()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  is_first boolean;
+begin
+  select not exists (select 1 from public.profiles) into is_first;
+  insert into public.profiles (id, name, email, role, team)
+  values (
+    new.id,
+    coalesce(new.raw_user_meta_data->>'name', ''),
+    new.email,
+    case when is_first then 'gestor' else 'colaborador' end,
+    coalesce(new.raw_user_meta_data->>'team', '')
+  )
+  on conflict (id) do nothing;
+  return new;
+end;
+$$;
+
+drop trigger if exists on_auth_user_created on auth.users;
+create trigger on_auth_user_created
+  after insert on auth.users
+  for each row execute function public.handle_new_user();
+
+-- ─── Realtime ────────────────────────────────────────────────
+-- Publica as tabelas para que o app receba mudanças em tempo real.
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public' and tablename = 'work_items'
+  ) then
+    alter publication supabase_realtime add table public.work_items;
+  end if;
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public' and tablename = 'profiles'
+  ) then
+    alter publication supabase_realtime add table public.profiles;
+  end if;
+end $$;
+
 -- ─── NOTA ────────────────────────────────────────────────────
 -- Para facilitar testes, desative a confirmação de e-mail em:
 -- Supabase Dashboard → Authentication → Providers → Email
 -- desmarque "Confirm email"
+--
+-- Se o banco já tem contas mas nenhum gestor, promova uma conta
+-- manualmente uma única vez:
+--   update public.profiles set role = 'gestor' where email = 'voce@email.com';
