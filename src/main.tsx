@@ -703,7 +703,8 @@ function Dashboard({
     setSaving(false);
 
     if (error) {
-      showToast("Não foi possível salvar a demanda. Tente novamente.", "error");
+      console.error("saveItem:", error);
+      showToast(`Não foi possível salvar a demanda: ${error.message}`, "error");
       return;
     }
 
@@ -718,7 +719,8 @@ function Dashboard({
       .update({ status, updated_at: new Date().toISOString() })
       .eq("id", id);
     if (error) {
-      showToast("Não foi possível atualizar o status.", "error");
+      console.error("updateStatus:", error);
+      showToast(`Não foi possível atualizar o status: ${error.message}`, "error");
       return;
     }
     await onRefresh();
@@ -746,7 +748,8 @@ function Dashboard({
     if (!window.confirm(`Excluir a demanda "${item.title}"?`)) return;
     const { error } = await supabase.from("work_items").delete().eq("id", id);
     if (error) {
-      showToast("Não foi possível excluir a demanda.", "error");
+      console.error("deleteItem:", error);
+      showToast(`Não foi possível excluir a demanda: ${error.message}`, "error");
       return;
     }
     await onRefresh();
