@@ -95,24 +95,23 @@ create trigger work_items_updated_at
 
 -- ─── Criação automática de perfil ao cadastrar ──────────────
 -- O perfil é criado pelo banco (não pelo cliente), lendo nome e
--- equipe do metadata enviado no signUp. O PRIMEIRO usuário a se
--- cadastrar vira 'gestor'; os demais entram como 'colaborador'.
+-- equipe do metadata enviado no signUp. Todo novo usuário entra
+-- como 'colaborador'. A primeira conta gestora deve ser promovida
+-- manualmente pelo dono do projeto via SQL Editor do Supabase
+-- (ver bloco "Bootstrap do primeiro gestor" no final deste arquivo).
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
 security definer
 set search_path = public
 as $$
-declare
-  is_first boolean;
 begin
-  select not exists (select 1 from public.profiles) into is_first;
   insert into public.profiles (id, name, email, role, team)
   values (
     new.id,
     coalesce(new.raw_user_meta_data->>'name', ''),
     new.email,
-    case when is_first then 'gestor' else 'colaborador' end,
+    'colaborador',
     coalesce(new.raw_user_meta_data->>'team', '')
   )
   on conflict (id) do nothing;
@@ -198,11 +197,17 @@ create trigger work_items_guard
   before update on public.work_items
   for each row execute function public.guard_work_item_update();
 
--- ─── NOTA ────────────────────────────────────────────────────
--- Para facilitar testes, desative a confirmação de e-mail em:
--- Supabase Dashboard → Authentication → Providers → Email
--- desmarque "Confirm email"
+-- ─── Bootstrap do primeiro gestor ────────────────────────────
+-- Todo usuário criado pelo signUp entra como 'colaborador'.
+-- Após cadastrar a SUA conta no app, rode UMA VEZ no SQL Editor
+-- do Supabase (que usa service_role e ignora RLS) para se promover:
 --
--- Se o banco já tem contas mas nenhum gestor, promova uma conta
--- manualmente uma única vez:
 --   update public.profiles set role = 'gestor' where email = 'voce@email.com';
+--
+-- A partir daí, você pode promover outros usuários pela tela de
+-- Administração dentro do próprio app.
+--
+-- ─── Confirmação de e-mail ───────────────────────────────────
+-- Em produção, mantenha "Confirm email" ATIVADO em:
+--   Supabase Dashboard → Authentication → Providers → Email
+-- Sem isso, qualquer e-mail (inclusive inventado) cria conta.

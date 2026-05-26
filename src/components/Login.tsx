@@ -33,28 +33,33 @@ export function Login() {
   async function handleRegister(event: FormEvent) {
     event.preventDefault();
     setError("");
+    setInfo("");
     setSubmitting(true);
 
-    const { data: authData, error: authError } = await supabase.auth.signUp({
+    const { error: authError } = await supabase.auth.signUp({
       email: email.trim(),
       password,
       options: { data: { name: name.trim(), team: team.trim() } },
     });
 
-    if (authError) {
-      setError(authError.message);
-      setSubmitting(false);
-      return;
-    }
-
-    if (!authData.session) {
-      setInfo(
-        "Conta criada! Verifique seu email para confirmar e depois faça login.",
-      );
-      switchMode("login");
-    }
-
     setSubmitting(false);
+
+    if (authError) {
+      const msg = authError.message.toLowerCase();
+      if (msg.includes("password") || msg.includes("senha")) {
+        setError(
+          "A senha precisa ter ao menos 8 caracteres, incluindo letras e números.",
+        );
+        return;
+      }
+      // Demais erros (notavelmente "user already registered"): cai no
+      // mesmo fluxo de sucesso para impedir enumeração de e-mails.
+    }
+
+    setInfo(
+      "Se for um novo cadastro, enviamos um e-mail de confirmação. Caso já tenha conta, faça login.",
+    );
+    switchMode("login");
   }
 
   async function handleForgotPassword() {
@@ -65,16 +70,15 @@ export function Login() {
     setError("");
     setInfo("");
     setSubmitting(true);
-    const { error: resetError } = await supabase.auth.resetPasswordForEmail(
-      email.trim(),
-      { redirectTo: window.location.origin },
-    );
+    await supabase.auth.resetPasswordForEmail(email.trim(), {
+      redirectTo: window.location.origin,
+    });
     setSubmitting(false);
-    if (resetError) {
-      setError(resetError.message);
-    } else {
-      setInfo("Enviamos um link de redefinição de senha para o seu email.");
-    }
+    // Mensagem fixa, independente de o e-mail existir ou não — evita
+    // que um atacante descubra quais contas estão cadastradas.
+    setInfo(
+      "Se este e-mail estiver cadastrado, enviaremos um link de redefinição.",
+    );
   }
 
   return (
@@ -165,10 +169,12 @@ export function Login() {
               <input
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                placeholder="mínimo 6 caracteres"
+                placeholder="mín. 8 caracteres, com letras e números"
                 type="password"
                 required
-                minLength={6}
+                minLength={8}
+                pattern="(?=.*[A-Za-z])(?=.*\d).{8,}"
+                title="A senha precisa ter ao menos 8 caracteres, incluindo letras e números."
               />
             </label>
             <label>
