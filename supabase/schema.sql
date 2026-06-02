@@ -25,13 +25,17 @@ create table if not exists public.work_items (
   project    text default '',
   notes      text default '',
   target_team text not null default '',
+  meeting_summary text not null default '',
+  meeting_goals jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
 
--- Migração para bancos existentes: adiciona a coluna sem quebrar dados antigos.
+-- Migração para bancos existentes: adiciona as colunas sem quebrar dados antigos.
 alter table public.work_items
-  add column if not exists target_team text not null default '';
+  add column if not exists target_team text not null default '',
+  add column if not exists meeting_summary text not null default '',
+  add column if not exists meeting_goals jsonb not null default '[]'::jsonb;
 
 -- ─── Row Level Security ──────────────────────────────────────
 alter table public.profiles   enable row level security;

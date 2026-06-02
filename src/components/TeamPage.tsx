@@ -5,6 +5,7 @@ import { formatDate } from "../utils";
 export function TeamPage({
   stats,
   items,
+  onOpenMeeting,
 }: {
   stats: Array<{
     user: User;
@@ -14,6 +15,7 @@ export function TeamPage({
     done: number;
   }>;
   items: WorkItem[];
+  onOpenMeeting: (id: number) => void;
 }) {
   return (
     <section className="management-panel" id="equipe">
@@ -57,14 +59,29 @@ export function TeamPage({
                 </div>
                 <div className="mini-list">
                   {assigned.length ? (
-                    assigned.map((item) => (
-                      <div key={item.id}>
-                        <strong>{item.title}</strong>
-                        <small>
-                          {formatDate(item.date)} às {item.time}
-                        </small>
-                      </div>
-                    ))
+                    assigned.map((item) =>
+                      item.kind === "reuniao" ? (
+                        <button
+                          key={item.id}
+                          type="button"
+                          className="mini-row meeting-row"
+                          onClick={() => onOpenMeeting(item.id)}
+                          title="Abrir notas e metas da reunião"
+                        >
+                          <strong>{item.title}</strong>
+                          <small>
+                            {formatDate(item.date)} às {item.time} · Reunião
+                          </small>
+                        </button>
+                      ) : (
+                        <div key={item.id} className="mini-row">
+                          <strong>{item.title}</strong>
+                          <small>
+                            {formatDate(item.date)} às {item.time}
+                          </small>
+                        </div>
+                      ),
+                    )
                   ) : (
                     <p className="muted-text">Sem pendências no momento.</p>
                   )}

@@ -21,6 +21,12 @@ export type User = {
   team: string;
 };
 
+export type MeetingGoal = {
+  id: string;
+  text: string;
+  done: boolean;
+};
+
 export type WorkItem = {
   id: number;
   title: string;
@@ -33,6 +39,8 @@ export type WorkItem = {
   project: string;
   notes: string;
   targetTeam: string;
+  meetingSummary: string;
+  meetingGoals: MeetingGoal[];
   createdAt: string;
   updatedAt: string;
 };

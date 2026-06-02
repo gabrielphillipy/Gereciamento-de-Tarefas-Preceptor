@@ -1,6 +1,14 @@
 // ─── Utilitários ─────────────────────────────────────────────
 
-import type { Kind, Role, Status, User, WorkForm, WorkItem } from "./types";
+import type {
+  Kind,
+  MeetingGoal,
+  Role,
+  Status,
+  User,
+  WorkForm,
+  WorkItem,
+} from "./types";
 import { kindLabel, priorityLabel, statusLabel, today } from "./constants";
 
 // ─── Mapeamento DB → TS ──────────────────────────────────────
@@ -18,6 +26,10 @@ export function mapItem(row: Record<string, unknown>): WorkItem {
     project: (row.project as string) ?? "",
     notes: (row.notes as string) ?? "",
     targetTeam: (row.target_team as string) ?? "",
+    meetingSummary: (row.meeting_summary as string) ?? "",
+    meetingGoals: Array.isArray(row.meeting_goals)
+      ? (row.meeting_goals as MeetingGoal[])
+      : [],
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };
@@ -113,6 +125,29 @@ export function initials(name: string) {
 
 export function isOverdue(item: WorkItem) {
   return item.status !== "concluida" && item.date < today;
+}
+
+// Encontra a reunião anterior do mesmo responsável (a mais recente
+// antes desta, em data+hora). Retorna undefined se não houver.
+export function findPreviousMeeting(items: WorkItem[], meeting: WorkItem) {
+  const key = `${meeting.date}${meeting.time}`;
+  return items
+    .filter(
+      (item) =>
+        item.kind === "reuniao" &&
+        item.ownerId === meeting.ownerId &&
+        item.id !== meeting.id &&
+        `${item.date}${item.time}` < key,
+    )
+    .sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`))[0];
+}
+
+// Identificador estável para metas (uuid quando disponível).
+export function newGoalId() {
+  if (typeof crypto !== "undefined" && "randomUUID" in crypto) {
+    return crypto.randomUUID();
+  }
+  return `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 9)}`;
 }
 
 export function groupItemsByDate(items: WorkItem[]) {

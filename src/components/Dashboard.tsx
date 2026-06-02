@@ -32,6 +32,7 @@ import { CalendarView } from "./CalendarView";
 import { IndicatorsPage } from "./IndicatorsPage";
 import { ItemsModal } from "./ItemsModal";
 import { KanbanBoard } from "./KanbanBoard";
+import { MeetingEditor, type MeetingPatch } from "./MeetingEditor";
 import { Metric } from "./Metric";
 import { NotificationCenter } from "./NotificationCenter";
 import { TeamPage } from "./TeamPage";
@@ -66,6 +67,7 @@ export function Dashboard({
   const [calPeriod, setCalPeriod] = useState<CalendarPeriod>("mes");
   const [dayModal, setDayModal] = useState<string | null>(null);
   const [metricModal, setMetricModal] = useState<MetricKey | null>(null);
+  const [meetingId, setMeetingId] = useState<number | null>(null);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
@@ -191,6 +193,11 @@ export function Dashboard({
     total: visibleItems.filter((item) => item.status === status).length,
   }));
 
+  const selectedMeeting =
+    meetingId !== null
+      ? (items.find((item) => item.id === meetingId) ?? null)
+      : null;
+
   function resetForm() {
     setForm(makeEmptyForm(firstColabId));
     setEditingId(null);
@@ -279,6 +286,27 @@ export function Dashboard({
     await onRefresh();
     showToast("Demanda excluída.", "success");
     if (editingId === id) resetForm();
+  }
+
+  async function saveMeeting(id: number, patch: MeetingPatch) {
+    const payload: Record<string, unknown> = {
+      updated_at: new Date().toISOString(),
+    };
+    if (patch.meetingSummary !== undefined) {
+      payload.meeting_summary = patch.meetingSummary;
+    }
+    if (patch.meetingGoals !== undefined) {
+      payload.meeting_goals = patch.meetingGoals;
+    }
+    const { error } = await supabase
+      .from("work_items")
+      .update(payload)
+      .eq("id", id);
+    if (error) {
+      console.error("saveMeeting:", error);
+      throw new Error(error.message);
+    }
+    await onRefresh();
   }
 
   function navigate(section: NavSection) {
@@ -500,7 +528,11 @@ export function Dashboard({
         </section>
 
         {activeNav === "equipe" ? (
-          <TeamPage stats={teamStats} items={visibleItems} />
+          <TeamPage
+            stats={teamStats}
+            items={visibleItems}
+            onOpenMeeting={(id) => setMeetingId(id)}
+          />
         ) : activeNav === "indicadores" ? (
           <IndicatorsPage
             metrics={metrics}
@@ -764,6 +796,16 @@ export function Dashboard({
           }}
           onDelete={deleteItem}
           onClose={() => setMetricModal(null)}
+        />
+      ) : null}
+
+      {selectedMeeting ? (
+        <MeetingEditor
+          meeting={selectedMeeting}
+          items={items}
+          allUsers={allUsers}
+          onSave={saveMeeting}
+          onClose={() => setMeetingId(null)}
         />
       ) : null}
 
