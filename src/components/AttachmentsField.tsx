@@ -5,6 +5,24 @@ import { supabase } from "../supabase";
 import { formatBytes, newGoalId } from "../utils";
 
 const BUCKET = "work-attachments";
+const MAX_FILE_SIZE = 10 * 1024 * 1024; // 10 MB
+const ALLOWED_TYPES = new Set([
+  "image/jpeg",
+  "image/png",
+  "image/gif",
+  "image/webp",
+  "image/svg+xml",
+  "application/pdf",
+  "text/plain",
+  "text/csv",
+  "application/msword",
+  "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+  "application/vnd.ms-excel",
+  "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+  "application/vnd.ms-powerpoint",
+  "application/vnd.openxmlformats-officedocument.presentationml.presentation",
+  "application/zip",
+]);
 
 export function AttachmentsField({
   attachments,
@@ -24,7 +42,17 @@ export function AttachmentsField({
     setError("");
     const added: Attachment[] = [];
     for (const file of Array.from(files)) {
-      const safeName = file.name.replace(/[^\w.\-]/g, "_");
+      if (file.size > MAX_FILE_SIZE) {
+        setError(`"${file.name}" ultrapassa o limite de 10 MB.`);
+        break;
+      }
+      if (!ALLOWED_TYPES.has(file.type)) {
+        setError(
+          `Tipo de arquivo não permitido: "${file.type || "desconhecido"}". Use imagens, PDF, documentos Office ou ZIP.`,
+        );
+        break;
+      }
+      const safeName = file.name.replace(/[^\w.-]/g, "_");
       const path = `${userId}/${Date.now()}-${safeName}`;
       const { error: upErr } = await supabase.storage
         .from(BUCKET)

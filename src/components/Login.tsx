@@ -107,10 +107,12 @@ export function Login() {
           </button>
         </div>
 
-        {info ? <p className="form-info">{info}</p> : null}
+        <div aria-live="polite" aria-atomic="true">
+          {info ? <p className="form-info" role="status">{info}</p> : null}
+        </div>
 
         {mode === "login" ? (
-          <form className="login-form" onSubmit={handleLogin}>
+          <form className="login-form" onSubmit={handleLogin} aria-label="Formulário de login">
             <label>
               Email
               <input
@@ -131,8 +133,10 @@ export function Login() {
                 required
               />
             </label>
-            {error ? <p className="form-error">{error}</p> : null}
-            <button className="primary-button" type="submit" disabled={submitting}>
+            <div aria-live="assertive" aria-atomic="true">
+              {error ? <p className="form-error" role="alert">{error}</p> : null}
+            </div>
+            <button className="primary-button" type="submit" disabled={submitting} aria-busy={submitting}>
               {submitting ? "Entrando..." : "Entrar"}
             </button>
             <button
@@ -144,7 +148,7 @@ export function Login() {
             </button>
           </form>
         ) : (
-          <form className="login-form" onSubmit={handleRegister}>
+          <form className="login-form" onSubmit={handleRegister} aria-label="Formulário de cadastro">
             <label>
               Nome completo
               <input
@@ -185,8 +189,10 @@ export function Login() {
                 placeholder="Ex: Marketing"
               />
             </label>
-            {error ? <p className="form-error">{error}</p> : null}
-            <button className="primary-button" type="submit" disabled={submitting}>
+            <div aria-live="assertive" aria-atomic="true">
+              {error ? <p className="form-error" role="alert">{error}</p> : null}
+            </div>
+            <button className="primary-button" type="submit" disabled={submitting} aria-busy={submitting}>
               {submitting ? "Criando conta..." : "Criar conta"}
             </button>
           </form>

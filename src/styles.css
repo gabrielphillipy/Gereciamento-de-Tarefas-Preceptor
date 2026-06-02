@@ -3272,3 +3272,83 @@ nav button.active::before {
 .comment-add .primary-button {
   justify-self: end;
 }
+
+/* ─── Modo escuro ────────────────────────────────────────── */
+
+html[data-theme="dark"] {
+  --paper-0: #0c1024;
+  --paper-1: #161a36;
+  --paper-2: #1d2247;
+  --paper-3: #232852;
+  --line: rgba(255, 255, 255, 0.08);
+  --line-strong: rgba(255, 255, 255, 0.14);
+  --line-faint: rgba(255, 255, 255, 0.04);
+  --text-1: #e6e9f7;
+  --text-2: #b4bad7;
+  --text-3: #8a90b6;
+  --text-4: #5b6193;
+  --ok-bg: rgba(16, 185, 129, 0.18);
+  --warn-bg: rgba(217, 119, 6, 0.22);
+  --danger-bg: rgba(225, 51, 90, 0.22);
+  --plum-bg: rgba(139, 92, 246, 0.22);
+  --aurora-50: rgba(61, 90, 255, 0.15);
+  --aurora-100: rgba(61, 90, 255, 0.22);
+  --shadow-xs: 0 1px 0 rgba(0, 0, 0, 0.5);
+  --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.45), 0 1px 1px rgba(0, 0, 0, 0.25);
+  --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.55), 0 1px 2px rgba(0, 0, 0, 0.3);
+  --shadow-lg: 0 24px 48px rgba(0, 0, 0, 0.65), 0 4px 12px rgba(0, 0, 0, 0.4);
+  --ring: 0 0 0 3px rgba(102, 128, 255, 0.5);
+  color: var(--text-1);
+  background: var(--paper-0);
+}
+
+html[data-theme="dark"] body {
+  background:
+    radial-gradient(820px 540px at -5% -8%, rgba(61, 90, 255, 0.22), transparent 60%),
+    radial-gradient(760px 520px at 104% 0%, rgba(21, 227, 227, 0.10), transparent 58%),
+    var(--paper-0);
+}
+
+/* Seta do select fica clara no escuro */
+html[data-theme="dark"] select {
+  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%238a90b6' stroke-width='2.4' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'/%3E%3C/svg%3E");
+}
+
+/* Cabeçalho do dia atual no calendário fica visível */
+html[data-theme="dark"] .calendar-day.is-today,
+html[data-theme="dark"] .selected-day,
+html[data-theme="dark"] .week-col.is-today {
+  background: rgba(61, 90, 255, 0.15);
+}
+
+/* Ajuste de inputs/textareas para contrastar no escuro */
+html[data-theme="dark"] input,
+html[data-theme="dark"] select,
+html[data-theme="dark"] textarea {
+  background: var(--paper-1);
+  border-color: var(--line-strong);
+  color: var(--text-1);
+}
+
+html[data-theme="dark"] input::placeholder,
+html[data-theme="dark"] textarea::placeholder {
+  color: var(--text-4);
+}
+
+/* Comentário próprio fica destacado mesmo no escuro */
+html[data-theme="dark"] .comment-row.mine .comment-content {
+  background: rgba(61, 90, 255, 0.18);
+}
+
+/* Toast no escuro: garantir contraste */
+html[data-theme="dark"] .toast-success {
+  background: rgba(16, 185, 129, 0.2);
+  border-color: rgba(16, 185, 129, 0.45);
+  color: #6fe7b2;
+}
+
+html[data-theme="dark"] .toast-error {
+  background: rgba(225, 51, 90, 0.22);
+  border-color: rgba(225, 51, 90, 0.5);
+  color: #ffb0c0;
+}

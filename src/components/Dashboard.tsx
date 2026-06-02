@@ -39,6 +39,7 @@ import { AttachmentsField } from "./AttachmentsField";
 import { CalendarView } from "./CalendarView";
 import { CommentsModal } from "./CommentsModal";
 import { IndicatorsPage } from "./IndicatorsPage";
+import { ThemeToggle } from "./ThemeToggle";
 import { ItemsModal } from "./ItemsModal";
 import { KanbanBoard } from "./KanbanBoard";
 import { MeetingEditor, type MeetingPatch } from "./MeetingEditor";
@@ -429,6 +430,7 @@ export function Dashboard({
               <small>{currentUser.role}</small>
             </div>
           </div>
+          <ThemeToggle />
           <button className="ghost-button" onClick={onLogout}>
             <LogOut size={18} />
             Sair

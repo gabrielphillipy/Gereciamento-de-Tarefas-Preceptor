@@ -13,6 +13,12 @@ status — tudo sincronizado em tempo real.
 - Páginas de equipe, indicadores e administração de usuários
 - Sincronização em tempo real entre usuários
 - Exportação das demandas em CSV
+- Editor de reuniões com cobrança das metas da reunião anterior
+- Tarefas recorrentes (diária, semanal, mensal)
+- Anexos de arquivos (bucket privado no Supabase Storage)
+- Comentários em qualquer demanda
+- Notificações de prazos próximos
+- **Modo claro e escuro** (segue a preferência do sistema)
 
 ## Stack
 
@@ -45,12 +51,16 @@ npm run dev
 
 ## Variáveis de ambiente
 
-| Variável            | Descrição                              |
-| ------------------- | -------------------------------------- |
-| `VITE_SUPABASE_URL` | URL do projeto Supabase                |
-| `VITE_SUPABASE_KEY` | Chave pública (anon key) do projeto    |
+| Variável            | Obrigatória | Descrição                              |
+| ------------------- | :---------: | -------------------------------------- |
+| `VITE_SUPABASE_URL` | sim         | URL do projeto Supabase                |
+| `VITE_SUPABASE_KEY` | sim         | Chave pública (anon key) do projeto    |
+| `VITE_SENTRY_DSN`   | não         | DSN do Sentry para monitorar erros     |
+| `VITE_APP_ENV`      | não         | `development` / `staging` / `production` |
 
-Encontradas em **Supabase → Project Settings → API**.
+As do Supabase ficam em **Supabase → Project Settings → API**.
+Há também `.env.staging.example` e `.env.production.example` como ponto
+de partida para esses ambientes.
 
 ## Scripts
 
@@ -68,13 +78,22 @@ Encontradas em **Supabase → Project Settings → API**.
 
 ```
 src/
-  main.tsx       Componentes e lógica da aplicação
-  styles.css     Estilos (tema "Azul com profundidade")
-  supabase.ts    Cliente do Supabase
+  main.tsx           Entrada do app (tema inicial + Sentry + montagem)
+  styles.css         Estilos (design system Aurora) + overrides do modo escuro
+  supabase.ts        Cliente do Supabase
+  theme.ts           Persistência de tema claro/escuro
+  types.ts           Tipos compartilhados
+  utils.ts           Helpers de data, CSV, anexos
+  constants.ts       Labels (status, kind, prioridade, recorrência)
+  hooks/             Hooks (useTheme, usePreceptorData)
+  components/        Componentes (Dashboard, Login, CalendarView,
+                     KanbanBoard, ItemsModal, MeetingEditor,
+                     AttachmentsField, CommentsModal, ThemeToggle, ...)
 supabase/
-  schema.sql     Definição das tabelas do banco
-tests/           Testes end-to-end (Playwright)
-public/          Arquivos estáticos (favicon, manifest)
+  schema.sql         Definição das tabelas, RLS, triggers e bucket
+tests/               Testes end-to-end (calendar, kanban, login)
+public/              Arquivos estáticos (favicon, manifest, logos)
+.github/workflows/   CI: lint, typecheck, build + deploys Vercel
 ```
 
 ## Deploy

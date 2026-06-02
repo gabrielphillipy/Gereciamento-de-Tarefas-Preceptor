@@ -1,16 +1,12 @@
-import * as Sentry from "@sentry/react";
 import { createRoot } from "react-dom/client";
 import { App } from "./components/App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import "./styles.css";
+import { applyInitialTheme } from "./theme";
 
-if (import.meta.env.VITE_SENTRY_DSN) {
-  Sentry.init({
-    dsn: import.meta.env.VITE_SENTRY_DSN as string,
-    environment: (import.meta.env.VITE_APP_ENV as string) ?? "development",
-    tracesSampleRate: 0.2,
-  });
-}
+// Aplica o tema (claro/escuro) antes do React renderizar para
+// evitar flash de tema claro em quem prefere escuro.
+applyInitialTheme();
 
 createRoot(document.getElementById("root")!).render(
   <ErrorBoundary>
