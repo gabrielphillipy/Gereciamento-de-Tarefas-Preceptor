@@ -1621,6 +1621,19 @@ nav button.active::before {
   color: var(--danger-500);
 }
 
+.recurrence-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  background: var(--paper-1);
+  color: var(--aurora-700);
+  border: 1px solid var(--line);
+}
+
+.recurrence-pill svg {
+  flex-shrink: 0;
+}
+
 .card-content h4 {
   margin: 0 0 6px;
   font-size: 1rem;

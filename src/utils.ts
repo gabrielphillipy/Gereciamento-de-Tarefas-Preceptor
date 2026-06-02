@@ -3,6 +3,7 @@
 import type {
   Kind,
   MeetingGoal,
+  Recurrence,
   Role,
   Status,
   User,
@@ -30,6 +31,7 @@ export function mapItem(row: Record<string, unknown>): WorkItem {
     meetingGoals: Array.isArray(row.meeting_goals)
       ? (row.meeting_goals as MeetingGoal[])
       : [],
+    recurrence: ((row.recurrence as Recurrence) ?? "none") as Recurrence,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };
@@ -56,6 +58,9 @@ export function makeEmptyForm(firstColabId = ""): WorkForm {
     project: "",
     notes: "",
     targetTeam: "",
+    meetingSummary: "",
+    meetingGoals: [],
+    recurrence: "none",
   };
 }
 
@@ -140,6 +145,25 @@ export function findPreviousMeeting(items: WorkItem[], meeting: WorkItem) {
         `${item.date}${item.time}` < key,
     )
     .sort((a, b) => `${b.date}${b.time}`.localeCompare(`${a.date}${a.time}`))[0];
+}
+
+// Gera as datas (ISO) de uma série recorrente a partir de uma data base.
+export function generateRecurrenceDates(
+  startDate: string,
+  recurrence: Recurrence,
+  count: number,
+): string[] {
+  if (recurrence === "none" || count <= 1) return [startDate];
+  const base = new Date(`${startDate}T00:00:00`);
+  const dates: string[] = [];
+  for (let i = 0; i < count; i++) {
+    const d = new Date(base);
+    if (recurrence === "diaria") d.setDate(base.getDate() + i);
+    else if (recurrence === "semanal") d.setDate(base.getDate() + i * 7);
+    else if (recurrence === "mensal") d.setMonth(base.getMonth() + i);
+    dates.push(toDateInputValue(d));
+  }
+  return dates;
 }
 
 // Identificador estável para metas (uuid quando disponível).

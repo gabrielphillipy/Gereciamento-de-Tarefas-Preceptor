@@ -12,6 +12,7 @@ export type NavSection =
   | "usuarios";
 export type CalendarPeriod = "dia" | "semana" | "mes" | "ano";
 export type MetricKey = "planejada" | "em-andamento" | "concluida" | "atrasada";
+export type Recurrence = "none" | "diaria" | "semanal" | "mensal";
 
 export type User = {
   id: string;
@@ -41,6 +42,7 @@ export type WorkItem = {
   targetTeam: string;
   meetingSummary: string;
   meetingGoals: MeetingGoal[];
+  recurrence: Recurrence;
   createdAt: string;
   updatedAt: string;
 };

@@ -1,6 +1,6 @@
-import { Edit3, Trash2 } from "lucide-react";
+import { Edit3, Repeat, Trash2 } from "lucide-react";
 import type { Status, User, WorkItem } from "../types";
-import { kindLabel, priorityLabel, statusLabel } from "../constants";
+import { kindLabel, priorityLabel, recurrenceLabel, statusLabel } from "../constants";
 import { formatDate, isOverdue } from "../utils";
 
 export function WorkCard({
@@ -44,6 +44,12 @@ export function WorkCard({
             {statusLabel[item.status]}
           </span>
           {overdue ? <span className="pill danger-pill">Atrasada</span> : null}
+          {item.recurrence !== "none" ? (
+            <span className="pill recurrence-pill" title="Demanda recorrente">
+              <Repeat size={12} />
+              {recurrenceLabel[item.recurrence]}
+            </span>
+          ) : null}
         </div>
         <h4>{item.title}</h4>
         <p>{item.notes}</p>

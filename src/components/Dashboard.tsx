@@ -20,14 +20,21 @@ import type {
   Kind,
   MetricKey,
   NavSection,
+  Recurrence,
   Status,
   User,
   ViewMode,
   WorkForm,
   WorkItem,
 } from "../types";
-import { statusLabel, today } from "../constants";
-import { formatFull, initials, isOverdue, makeEmptyForm } from "../utils";
+import { recurrenceLabel, statusLabel, today } from "../constants";
+import {
+  formatFull,
+  generateRecurrenceDates,
+  initials,
+  isOverdue,
+  makeEmptyForm,
+} from "../utils";
 import { CalendarView } from "./CalendarView";
 import { IndicatorsPage } from "./IndicatorsPage";
 import { ItemsModal } from "./ItemsModal";
@@ -68,6 +75,7 @@ export function Dashboard({
   const [dayModal, setDayModal] = useState<string | null>(null);
   const [metricModal, setMetricModal] = useState<MetricKey | null>(null);
   const [meetingId, setMeetingId] = useState<number | null>(null);
+  const [recurrenceCount, setRecurrenceCount] = useState(4);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{
     message: string;
@@ -200,6 +208,7 @@ export function Dashboard({
 
   function resetForm() {
     setForm(makeEmptyForm(firstColabId));
+    setRecurrenceCount(4);
     setEditingId(null);
     setComposerOpen(false);
   }
@@ -208,27 +217,46 @@ export function Dashboard({
     event.preventDefault();
     setSaving(true);
     const timestamp = new Date().toISOString();
-    const payload = {
+    const basePayload = {
       title: form.title,
       owner_id: form.ownerId,
       kind: form.kind,
-      date: form.date,
       time: form.time,
       priority: form.priority,
       project: form.project,
       notes: form.notes,
       target_team: form.targetTeam,
+      meeting_summary: form.meetingSummary,
+      meeting_goals: form.meetingGoals,
+      recurrence: form.recurrence,
       updated_at: timestamp,
     };
 
-    const { error } = editingId
-      ? await supabase
-          .from("work_items")
-          .update({ ...payload, status: form.status })
-          .eq("id", editingId)
-      : await supabase
-          .from("work_items")
-          .insert({ ...payload, status: "planejada", created_at: timestamp });
+    let error: { message: string } | null = null;
+    let createdCount = 1;
+
+    if (editingId) {
+      const res = await supabase
+        .from("work_items")
+        .update({ ...basePayload, date: form.date, status: form.status })
+        .eq("id", editingId);
+      error = res.error;
+    } else {
+      const dates = generateRecurrenceDates(
+        form.date,
+        form.recurrence,
+        Math.max(1, Math.min(52, recurrenceCount)),
+      );
+      const rows = dates.map((date) => ({
+        ...basePayload,
+        date,
+        status: "planejada",
+        created_at: timestamp,
+      }));
+      createdCount = rows.length;
+      const res = await supabase.from("work_items").insert(rows);
+      error = res.error;
+    }
 
     setSaving(false);
 
@@ -239,7 +267,14 @@ export function Dashboard({
     }
 
     await onRefresh();
-    showToast(editingId ? "Demanda atualizada." : "Demanda criada.", "success");
+    showToast(
+      editingId
+        ? "Demanda atualizada."
+        : createdCount > 1
+          ? `${createdCount} demandas criadas.`
+          : "Demanda criada.",
+      "success",
+    );
     resetForm();
   }
 
@@ -269,6 +304,9 @@ export function Dashboard({
       project: item.project,
       notes: item.notes,
       targetTeam: item.targetTeam,
+      meetingSummary: item.meetingSummary,
+      meetingGoals: item.meetingGoals,
+      recurrence: item.recurrence,
       status: item.status,
     });
   }
@@ -728,6 +766,43 @@ export function Dashboard({
                     onChange={(event) => setForm({ ...form, time: event.target.value })}
                   />
                 </label>
+              </div>
+              <div className="form-pair">
+                <label>
+                  Repetir
+                  <select
+                    value={form.recurrence}
+                    onChange={(event) =>
+                      setForm({
+                        ...form,
+                        recurrence: event.target.value as Recurrence,
+                      })
+                    }
+                  >
+                    <option value="none">{recurrenceLabel.none}</option>
+                    <option value="diaria">{recurrenceLabel.diaria}</option>
+                    <option value="semanal">{recurrenceLabel.semanal}</option>
+                    <option value="mensal">{recurrenceLabel.mensal}</option>
+                  </select>
+                </label>
+                {!editingId && form.recurrence !== "none" ? (
+                  <label>
+                    Repetir por (vezes)
+                    <input
+                      type="number"
+                      min={2}
+                      max={52}
+                      value={recurrenceCount}
+                      onChange={(event) =>
+                        setRecurrenceCount(
+                          Math.max(2, Math.min(52, Number(event.target.value) || 2)),
+                        )
+                      }
+                    />
+                  </label>
+                ) : (
+                  <div />
+                )}
               </div>
               <label>
                 Projeto

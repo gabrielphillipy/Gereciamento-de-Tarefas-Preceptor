@@ -27,6 +27,8 @@ create table if not exists public.work_items (
   target_team text not null default '',
   meeting_summary text not null default '',
   meeting_goals jsonb not null default '[]'::jsonb,
+  recurrence text not null default 'none'
+    check (recurrence in ('none', 'diaria', 'semanal', 'mensal')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -35,7 +37,9 @@ create table if not exists public.work_items (
 alter table public.work_items
   add column if not exists target_team text not null default '',
   add column if not exists meeting_summary text not null default '',
-  add column if not exists meeting_goals jsonb not null default '[]'::jsonb;
+  add column if not exists meeting_goals jsonb not null default '[]'::jsonb,
+  add column if not exists recurrence text not null default 'none'
+    check (recurrence in ('none', 'diaria', 'semanal', 'mensal'));
 
 -- ─── Row Level Security ──────────────────────────────────────
 alter table public.profiles   enable row level security;
@@ -201,7 +205,8 @@ begin
   or new.priority    is distinct from old.priority
   or new.project     is distinct from old.project
   or new.notes       is distinct from old.notes
-  or new.target_team is distinct from old.target_team then
+  or new.target_team is distinct from old.target_team
+  or new.recurrence  is distinct from old.recurrence then
     raise exception 'Colaboradores só podem alterar o status da demanda.';
   end if;
   return new;

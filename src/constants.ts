@@ -1,6 +1,6 @@
 // ─── Constantes ──────────────────────────────────────────────
 
-import type { Kind, Status, WorkItem } from "./types";
+import type { Kind, Recurrence, Status, WorkItem } from "./types";
 
 export const today = new Date().toISOString().slice(0, 10);
 
@@ -21,4 +21,11 @@ export const priorityLabel: Record<WorkItem["priority"], string> = {
   Baixa: "Baixa",
   Media: "Média",
   Alta: "Alta",
+};
+
+export const recurrenceLabel: Record<Recurrence, string> = {
+  none: "Não repete",
+  diaria: "Diária",
+  semanal: "Semanal",
+  mensal: "Mensal",
 };
