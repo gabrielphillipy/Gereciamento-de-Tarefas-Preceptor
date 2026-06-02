@@ -51,16 +51,12 @@ npm run dev
 
 ## Variáveis de ambiente
 
-| Variável            | Obrigatória | Descrição                              |
-| ------------------- | :---------: | -------------------------------------- |
-| `VITE_SUPABASE_URL` | sim         | URL do projeto Supabase                |
-| `VITE_SUPABASE_KEY` | sim         | Chave pública (anon key) do projeto    |
-| `VITE_SENTRY_DSN`   | não         | DSN do Sentry para monitorar erros     |
-| `VITE_APP_ENV`      | não         | `development` / `staging` / `production` |
+| Variável            | Descrição                              |
+| ------------------- | -------------------------------------- |
+| `VITE_SUPABASE_URL` | URL do projeto Supabase                |
+| `VITE_SUPABASE_KEY` | Chave pública (anon key) do projeto    |
 
-As do Supabase ficam em **Supabase → Project Settings → API**.
-Há também `.env.staging.example` e `.env.production.example` como ponto
-de partida para esses ambientes.
+Encontradas em **Supabase → Project Settings → API**.
 
 ## Scripts
 
@@ -78,7 +74,7 @@ de partida para esses ambientes.
 
 ```
 src/
-  main.tsx           Entrada do app (tema inicial + Sentry + montagem)
+  main.tsx           Entrada do app (tema inicial + montagem)
   styles.css         Estilos (design system Aurora) + overrides do modo escuro
   supabase.ts        Cliente do Supabase
   theme.ts           Persistência de tema claro/escuro
@@ -93,7 +89,7 @@ supabase/
   schema.sql         Definição das tabelas, RLS, triggers e bucket
 tests/               Testes end-to-end (calendar, kanban, login)
 public/              Arquivos estáticos (favicon, manifest, logos)
-.github/workflows/   CI: lint, typecheck, build + deploys Vercel
+.github/workflows/   CI: lint, typecheck e build
 ```
 
 ## Deploy
