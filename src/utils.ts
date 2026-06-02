@@ -17,6 +17,7 @@ export function mapItem(row: Record<string, unknown>): WorkItem {
     priority: row.priority as WorkItem["priority"],
     project: (row.project as string) ?? "",
     notes: (row.notes as string) ?? "",
+    targetTeam: (row.target_team as string) ?? "",
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };
@@ -42,6 +43,7 @@ export function makeEmptyForm(firstColabId = ""): WorkForm {
     priority: "Media",
     project: "",
     notes: "",
+    targetTeam: "",
   };
 }
 

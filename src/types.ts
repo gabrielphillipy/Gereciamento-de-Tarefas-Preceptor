@@ -32,6 +32,7 @@ export type WorkItem = {
   priority: "Baixa" | "Media" | "Alta";
   project: string;
   notes: string;
+  targetTeam: string;
   createdAt: string;
   updatedAt: string;
 };

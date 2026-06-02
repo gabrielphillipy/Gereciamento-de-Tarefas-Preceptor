@@ -24,9 +24,14 @@ create table if not exists public.work_items (
   priority   text not null check (priority in ('Baixa', 'Media', 'Alta')) default 'Media',
   project    text default '',
   notes      text default '',
+  target_team text not null default '',
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
+
+-- Migração para bancos existentes: adiciona a coluna sem quebrar dados antigos.
+alter table public.work_items
+  add column if not exists target_team text not null default '';
 
 -- ─── Row Level Security ──────────────────────────────────────
 alter table public.profiles   enable row level security;
@@ -70,9 +75,15 @@ create policy "work_items_gestor_all" on public.work_items
   using  ((select role from public.profiles where id = auth.uid()) = 'gestor')
   with check ((select role from public.profiles where id = auth.uid()) = 'gestor');
 
--- Work items: colaborador lê as próprias demandas
+-- Work items: colaborador lê as próprias demandas, as gerais
+-- (sem equipe alvo) e as direcionadas à sua equipe.
+drop policy if exists "work_items_colab_select" on public.work_items;
 create policy "work_items_colab_select" on public.work_items
-  for select to authenticated using (owner_id = auth.uid());
+  for select to authenticated using (
+    owner_id = auth.uid()
+    or coalesce(target_team, '') = ''
+    or target_team = (select team from public.profiles where id = auth.uid())
+  );
 
 -- Work items: colaborador atualiza status das próprias demandas
 create policy "work_items_colab_update" on public.work_items
@@ -178,14 +189,15 @@ begin
   if public.is_gestor() then
     return new;
   end if;
-  if new.title    is distinct from old.title
-  or new.owner_id is distinct from old.owner_id
-  or new.kind     is distinct from old.kind
-  or new.date     is distinct from old.date
-  or new.time     is distinct from old.time
-  or new.priority is distinct from old.priority
-  or new.project  is distinct from old.project
-  or new.notes    is distinct from old.notes then
+  if new.title       is distinct from old.title
+  or new.owner_id    is distinct from old.owner_id
+  or new.kind        is distinct from old.kind
+  or new.date        is distinct from old.date
+  or new.time        is distinct from old.time
+  or new.priority    is distinct from old.priority
+  or new.project     is distinct from old.project
+  or new.notes       is distinct from old.notes
+  or new.target_team is distinct from old.target_team then
     raise exception 'Colaboradores só podem alterar o status da demanda.';
   end if;
   return new;

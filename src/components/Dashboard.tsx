@@ -59,6 +59,7 @@ export function Dashboard({
   const [statusFilter, setStatusFilter] = useState<Status | "todos">("todos");
   const [ownerFilter, setOwnerFilter] = useState("todos");
   const [kindFilter, setKindFilter] = useState<Kind | "todos">("todos");
+  const [teamFilter, setTeamFilter] = useState("todos");
   const [editingId, setEditingId] = useState<number | null>(null);
   const [composerOpen, setComposerOpen] = useState(false);
   const [selectedDate, setSelectedDate] = useState(today);
@@ -85,22 +86,43 @@ export function Dashboard({
     setToast({ message, tone });
   }
 
+  // Cargos disponíveis (derivados das equipes cadastradas nos perfis).
+  const teamOptions = useMemo(
+    () => Array.from(new Set(allUsers.map((u) => u.team).filter(Boolean))).sort(),
+    [allUsers],
+  );
+
+  // Regra de visibilidade:
+  //  - gestor vê tudo;
+  //  - colaborador vê o que é dele, as demandas gerais (sem equipe alvo)
+  //    e as direcionadas à equipe dele.
   const myItems = useMemo(
     () =>
-      items.filter((item) =>
-        currentUser.role === "gestor" ? true : item.ownerId === currentUser.id,
-      ),
+      items.filter((item) => {
+        if (currentUser.role === "gestor") return true;
+        if (item.ownerId === currentUser.id) return true;
+        if (!item.targetTeam) return true;
+        return item.targetTeam === currentUser.team;
+      }),
     [items, currentUser],
   );
 
   const visibleItems = useMemo(() => {
     return items
-      .filter((item) =>
-        currentUser.role === "gestor" ? true : item.ownerId === currentUser.id,
-      )
+      .filter((item) => {
+        if (currentUser.role === "gestor") return true;
+        if (item.ownerId === currentUser.id) return true;
+        if (!item.targetTeam) return true;
+        return item.targetTeam === currentUser.team;
+      })
       .filter((item) => statusFilter === "todos" || item.status === statusFilter)
       .filter((item) => ownerFilter === "todos" || item.ownerId === ownerFilter)
       .filter((item) => kindFilter === "todos" || item.kind === kindFilter)
+      .filter((item) => {
+        if (teamFilter === "todos") return true;
+        if (teamFilter === "geral") return !item.targetTeam;
+        return item.targetTeam === teamFilter;
+      })
       .filter((item) => {
         const owner = allUsers.find((u) => u.id === item.ownerId)?.name ?? "";
         const text =
@@ -108,7 +130,16 @@ export function Dashboard({
         return text.includes(query.toLowerCase());
       })
       .sort((a, b) => `${a.date}${a.time}`.localeCompare(`${b.date}${b.time}`));
-  }, [currentUser, items, allUsers, kindFilter, ownerFilter, query, statusFilter]);
+  }, [
+    currentUser,
+    items,
+    allUsers,
+    kindFilter,
+    ownerFilter,
+    query,
+    statusFilter,
+    teamFilter,
+  ]);
 
   const metrics = {
     total: visibleItems.length,
@@ -179,6 +210,7 @@ export function Dashboard({
       priority: form.priority,
       project: form.project,
       notes: form.notes,
+      target_team: form.targetTeam,
       updated_at: timestamp,
     };
 
@@ -229,6 +261,7 @@ export function Dashboard({
       priority: item.priority,
       project: item.project,
       notes: item.notes,
+      targetTeam: item.targetTeam,
       status: item.status,
     });
   }
@@ -436,6 +469,19 @@ export function Dashboard({
               <option value="reuniao">Reunião</option>
               <option value="entrega">Entrega</option>
             </select>
+            <select
+              aria-label="Filtro de cargo"
+              value={teamFilter}
+              onChange={(event) => setTeamFilter(event.target.value)}
+            >
+              <option value="todos">Todos os cargos</option>
+              <option value="geral">Geral (sem restrição)</option>
+              {teamOptions.map((team) => (
+                <option key={team} value={team}>
+                  {team}
+                </option>
+              ))}
+            </select>
             {currentUser.role === "gestor" ? (
               <select
                 aria-label="Filtro de responsavel"
@@ -567,6 +613,22 @@ export function Dashboard({
                     ))
                   )}
                 </select>
+              </label>
+              <label>
+                Equipe alvo (opcional)
+                <input
+                  list="team-options"
+                  value={form.targetTeam}
+                  onChange={(event) =>
+                    setForm({ ...form, targetTeam: event.target.value })
+                  }
+                  placeholder="Vazio = visível a todos"
+                />
+                <datalist id="team-options">
+                  {teamOptions.map((team) => (
+                    <option key={team} value={team} />
+                  ))}
+                </datalist>
               </label>
               <div className="form-pair">
                 <label>
