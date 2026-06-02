@@ -35,6 +35,7 @@ import {
   isOverdue,
   makeEmptyForm,
 } from "../utils";
+import { AttachmentsField } from "./AttachmentsField";
 import { CalendarView } from "./CalendarView";
 import { IndicatorsPage } from "./IndicatorsPage";
 import { ItemsModal } from "./ItemsModal";
@@ -229,6 +230,7 @@ export function Dashboard({
       meeting_summary: form.meetingSummary,
       meeting_goals: form.meetingGoals,
       recurrence: form.recurrence,
+      attachments: form.attachments,
       updated_at: timestamp,
     };
 
@@ -307,6 +309,7 @@ export function Dashboard({
       meetingSummary: item.meetingSummary,
       meetingGoals: item.meetingGoals,
       recurrence: item.recurrence,
+      attachments: item.attachments,
       status: item.status,
     });
   }
@@ -822,6 +825,11 @@ export function Dashboard({
                   placeholder="Contexto, briefing ou link"
                 />
               </label>
+              <AttachmentsField
+                attachments={form.attachments}
+                onChange={(next) => setForm({ ...form, attachments: next })}
+                userId={currentUser.id}
+              />
               <div className="form-actions">
                 <button className="primary-button" type="submit" disabled={saving}>
                   <Save size={18} />

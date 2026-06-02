@@ -3069,3 +3069,91 @@ nav button.active::before {
   min-height: 42px;
   white-space: nowrap;
 }
+
+/* ─── Anexos ─────────────────────────────────────────────── */
+
+.attachments-field {
+  display: grid;
+  gap: 8px;
+}
+
+.attachments-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+
+.attachments-title {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 0.82rem;
+  font-weight: 550;
+  color: var(--text-3);
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.attachments-empty {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.attachments-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  gap: 6px;
+}
+
+.attachments-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 10px;
+  border-radius: var(--r-8);
+  background: var(--paper-1);
+  border: 1px solid var(--line);
+  border-left: 2px solid var(--aurora-500);
+}
+
+.attachments-name {
+  flex: 1;
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 6px;
+  margin: -4px -6px;
+  background: none;
+  border: none;
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  font-size: 0.88rem;
+  font-weight: 500;
+  cursor: pointer;
+  border-radius: var(--r-8);
+  transition: background 0.15s var(--ease);
+}
+
+.attachments-name:hover {
+  background: var(--paper-0);
+  color: var(--aurora-700);
+}
+
+.attachments-name span {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.attachments-name small {
+  color: var(--text-3);
+  font-size: 0.74rem;
+  font-family: var(--font-mono);
+  font-feature-settings: "tnum";
+}

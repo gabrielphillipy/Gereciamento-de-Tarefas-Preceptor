@@ -28,6 +28,15 @@ export type MeetingGoal = {
   done: boolean;
 };
 
+export type Attachment = {
+  id: string;
+  name: string;
+  path: string;
+  size: number;
+  type: string;
+  uploadedAt: string;
+};
+
 export type WorkItem = {
   id: number;
   title: string;
@@ -43,6 +52,7 @@ export type WorkItem = {
   meetingSummary: string;
   meetingGoals: MeetingGoal[];
   recurrence: Recurrence;
+  attachments: Attachment[];
   createdAt: string;
   updatedAt: string;
 };

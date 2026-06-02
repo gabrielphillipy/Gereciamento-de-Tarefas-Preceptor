@@ -1,6 +1,7 @@
 // ─── Utilitários ─────────────────────────────────────────────
 
 import type {
+  Attachment,
   Kind,
   MeetingGoal,
   Recurrence,
@@ -32,6 +33,9 @@ export function mapItem(row: Record<string, unknown>): WorkItem {
       ? (row.meeting_goals as MeetingGoal[])
       : [],
     recurrence: ((row.recurrence as Recurrence) ?? "none") as Recurrence,
+    attachments: Array.isArray(row.attachments)
+      ? (row.attachments as Attachment[])
+      : [],
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
   };
@@ -61,6 +65,7 @@ export function makeEmptyForm(firstColabId = ""): WorkForm {
     meetingSummary: "",
     meetingGoals: [],
     recurrence: "none",
+    attachments: [],
   };
 }
 
@@ -164,6 +169,13 @@ export function generateRecurrenceDates(
     dates.push(toDateInputValue(d));
   }
   return dates;
+}
+
+// Formata bytes em KB/MB para exibir tamanho de anexos.
+export function formatBytes(bytes: number) {
+  if (bytes < 1024) return `${bytes} B`;
+  if (bytes < 1024 * 1024) return `${(bytes / 1024).toFixed(1)} KB`;
+  return `${(bytes / 1024 / 1024).toFixed(1)} MB`;
 }
 
 // Identificador estável para metas (uuid quando disponível).

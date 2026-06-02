@@ -1,4 +1,4 @@
-import { Edit3, Repeat, Trash2 } from "lucide-react";
+import { Edit3, Paperclip, Repeat, Trash2 } from "lucide-react";
 import type { Status, User, WorkItem } from "../types";
 import { kindLabel, priorityLabel, recurrenceLabel, statusLabel } from "../constants";
 import { formatDate, isOverdue } from "../utils";
@@ -48,6 +48,12 @@ export function WorkCard({
             <span className="pill recurrence-pill" title="Demanda recorrente">
               <Repeat size={12} />
               {recurrenceLabel[item.recurrence]}
+            </span>
+          ) : null}
+          {item.attachments.length > 0 ? (
+            <span className="pill recurrence-pill" title={`${item.attachments.length} anexo(s)`}>
+              <Paperclip size={12} />
+              {item.attachments.length}
             </span>
           ) : null}
         </div>

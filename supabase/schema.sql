@@ -29,6 +29,7 @@ create table if not exists public.work_items (
   meeting_goals jsonb not null default '[]'::jsonb,
   recurrence text not null default 'none'
     check (recurrence in ('none', 'diaria', 'semanal', 'mensal')),
+  attachments jsonb not null default '[]'::jsonb,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
 );
@@ -39,7 +40,8 @@ alter table public.work_items
   add column if not exists meeting_summary text not null default '',
   add column if not exists meeting_goals jsonb not null default '[]'::jsonb,
   add column if not exists recurrence text not null default 'none'
-    check (recurrence in ('none', 'diaria', 'semanal', 'mensal'));
+    check (recurrence in ('none', 'diaria', 'semanal', 'mensal')),
+  add column if not exists attachments jsonb not null default '[]'::jsonb;
 
 -- ─── Row Level Security ──────────────────────────────────────
 alter table public.profiles   enable row level security;
@@ -217,6 +219,38 @@ drop trigger if exists work_items_guard on public.work_items;
 create trigger work_items_guard
   before update on public.work_items
   for each row execute function public.guard_work_item_update();
+
+-- ─── Storage: bucket de anexos ───────────────────────────────
+-- Bucket privado para arquivos anexados às demandas. Arquivos só
+-- acessíveis via URL assinada (createSignedUrl) pelo cliente.
+insert into storage.buckets (id, name, public)
+values ('work-attachments', 'work-attachments', false)
+on conflict (id) do nothing;
+
+-- Qualquer usuário autenticado lê os arquivos do bucket
+-- (a app só monta links assinados a partir de paths já no banco,
+-- e a coluna attachments é protegida pelo RLS de work_items).
+drop policy if exists "work_attachments_select" on storage.objects;
+create policy "work_attachments_select" on storage.objects
+  for select to authenticated
+  using (bucket_id = 'work-attachments');
+
+-- Upload/remoção restritos à pasta do próprio usuário ({uid}/...).
+drop policy if exists "work_attachments_insert" on storage.objects;
+create policy "work_attachments_insert" on storage.objects
+  for insert to authenticated
+  with check (
+    bucket_id = 'work-attachments'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
+
+drop policy if exists "work_attachments_delete" on storage.objects;
+create policy "work_attachments_delete" on storage.objects
+  for delete to authenticated
+  using (
+    bucket_id = 'work-attachments'
+    and (storage.foldername(name))[1] = auth.uid()::text
+  );
 
 -- ─── Bootstrap do primeiro gestor ────────────────────────────
 -- Todo usuário criado pelo signUp entra como 'colaborador'.
