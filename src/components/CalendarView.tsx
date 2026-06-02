@@ -18,6 +18,7 @@ export function CalendarView({
   onStatusChange,
   onEdit,
   onDelete,
+  onOpenComments,
   period,
   onPeriodChange,
   onOpenDay,
@@ -30,6 +31,7 @@ export function CalendarView({
   onStatusChange: (id: number, status: Status) => void;
   onEdit: (item: WorkItem) => void;
   onDelete: (id: number) => void;
+  onOpenComments: (id: number) => void;
   period: CalendarPeriod;
   onPeriodChange: (period: CalendarPeriod) => void;
   onOpenDay: (date: string) => void;
@@ -221,6 +223,7 @@ export function CalendarView({
                   onStatusChange={onStatusChange}
                   onEdit={onEdit}
                   onDelete={onDelete}
+                  onOpenComments={onOpenComments}
                 />
               ))}
             </div>

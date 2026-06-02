@@ -10,6 +10,7 @@ export function KanbanBoard({
   onStatusChange,
   onEdit,
   onDelete,
+  onOpenComments,
 }: {
   items: WorkItem[];
   allUsers: User[];
@@ -17,6 +18,7 @@ export function KanbanBoard({
   onStatusChange: (id: number, status: Status) => void;
   onEdit: (item: WorkItem) => void;
   onDelete: (id: number) => void;
+  onOpenComments: (id: number) => void;
 }) {
   const columns: Status[] = ["planejada", "em-andamento", "revisao", "concluida"];
   const [draggingId, setDraggingId] = useState<number | null>(null);
@@ -79,6 +81,7 @@ export function KanbanBoard({
                       onStatusChange={onStatusChange}
                       onEdit={onEdit}
                       onDelete={onDelete}
+                      onOpenComments={onOpenComments}
                     />
                   </div>
                 );

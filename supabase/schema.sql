@@ -252,6 +252,78 @@ create policy "work_attachments_delete" on storage.objects
     and (storage.foldername(name))[1] = auth.uid()::text
   );
 
+-- ─── Comentários das demandas ────────────────────────────────
+create table if not exists public.work_item_comments (
+  id           bigserial primary key,
+  work_item_id bigint not null references public.work_items(id) on delete cascade,
+  author_id    uuid not null references public.profiles(id) on delete cascade,
+  body         text not null,
+  created_at   timestamptz not null default now()
+);
+
+create index if not exists work_item_comments_item_idx
+  on public.work_item_comments(work_item_id);
+
+alter table public.work_item_comments enable row level security;
+
+-- Helper: o autor enxerga o work_item alvo (mesma regra de visibilidade
+-- do colaborador). Reduz duplicação nas policies abaixo.
+create or replace function public.can_see_work_item(item_id bigint)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (
+    select 1 from public.work_items wi
+    where wi.id = item_id
+      and (
+        public.is_gestor()
+        or wi.owner_id = auth.uid()
+        or coalesce(wi.target_team, '') = ''
+        or wi.target_team = (select team from public.profiles where id = auth.uid())
+      )
+  );
+$$;
+
+drop policy if exists "comments_select" on public.work_item_comments;
+create policy "comments_select" on public.work_item_comments
+  for select to authenticated
+  using (public.can_see_work_item(work_item_id));
+
+drop policy if exists "comments_insert" on public.work_item_comments;
+create policy "comments_insert" on public.work_item_comments
+  for insert to authenticated
+  with check (
+    author_id = auth.uid()
+    and public.can_see_work_item(work_item_id)
+  );
+
+-- Atualizar/excluir: só o autor; gestor pode moderar.
+drop policy if exists "comments_update" on public.work_item_comments;
+create policy "comments_update" on public.work_item_comments
+  for update to authenticated
+  using (author_id = auth.uid() or public.is_gestor())
+  with check (author_id = auth.uid() or public.is_gestor());
+
+drop policy if exists "comments_delete" on public.work_item_comments;
+create policy "comments_delete" on public.work_item_comments
+  for delete to authenticated
+  using (author_id = auth.uid() or public.is_gestor());
+
+-- Realtime para comentários
+do $$
+begin
+  if not exists (
+    select 1 from pg_publication_tables
+    where pubname = 'supabase_realtime'
+      and schemaname = 'public' and tablename = 'work_item_comments'
+  ) then
+    alter publication supabase_realtime add table public.work_item_comments;
+  end if;
+end $$;
+
 -- ─── Bootstrap do primeiro gestor ────────────────────────────
 -- Todo usuário criado pelo signUp entra como 'colaborador'.
 -- Após cadastrar a SUA conta no app, rode UMA VEZ no SQL Editor

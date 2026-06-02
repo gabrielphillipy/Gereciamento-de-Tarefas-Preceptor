@@ -21,6 +21,7 @@ export function ItemsModal({
   onStatusChange: (id: number, status: Status) => void;
   onEdit: (item: WorkItem) => void;
   onDelete: (id: number) => void;
+  onOpenComments: (id: number) => void;
   onClose: () => void;
 }) {
   return (
@@ -61,6 +62,7 @@ export function ItemsModal({
                   onStatusChange={onStatusChange}
                   onEdit={onEdit}
                   onDelete={onDelete}
+                  onOpenComments={onOpenComments}
                 />
               ))}
             </div>

@@ -2,6 +2,7 @@
 
 import type {
   Attachment,
+  Comment,
   Kind,
   MeetingGoal,
   Recurrence,
@@ -41,6 +42,16 @@ export function mapItem(row: Record<string, unknown>): WorkItem {
   };
 }
 
+export function mapComment(row: Record<string, unknown>): Comment {
+  return {
+    id: row.id as number,
+    workItemId: row.work_item_id as number,
+    authorId: row.author_id as string,
+    body: row.body as string,
+    createdAt: row.created_at as string,
+  };
+}
+
 export function mapUser(row: Record<string, unknown>): User {
   return {
     id: row.id as string,
@@ -76,6 +87,17 @@ export function formatDate(date: string, short = false) {
     day: "2-digit",
     month: short ? "short" : "2-digit",
     year: short ? undefined : "numeric",
+  });
+}
+
+export function formatDateTime(iso: string) {
+  const d = new Date(iso);
+  return d.toLocaleString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+    year: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
   });
 }
 

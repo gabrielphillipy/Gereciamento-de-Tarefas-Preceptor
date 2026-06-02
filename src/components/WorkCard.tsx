@@ -1,4 +1,4 @@
-import { Edit3, Paperclip, Repeat, Trash2 } from "lucide-react";
+import { Edit3, MessageSquare, Paperclip, Repeat, Trash2 } from "lucide-react";
 import type { Status, User, WorkItem } from "../types";
 import { kindLabel, priorityLabel, recurrenceLabel, statusLabel } from "../constants";
 import { formatDate, isOverdue } from "../utils";
@@ -12,6 +12,7 @@ export function WorkCard({
   onStatusChange,
   onEdit,
   onDelete,
+  onOpenComments,
 }: {
   item: WorkItem;
   allUsers: User[];
@@ -21,6 +22,7 @@ export function WorkCard({
   onStatusChange: (id: number, status: Status) => void;
   onEdit: (item: WorkItem) => void;
   onDelete: (id: number) => void;
+  onOpenComments: (id: number) => void;
 }) {
   const owner = allUsers.find((u) => u.id === item.ownerId);
   const overdue = isOverdue(item);
@@ -82,24 +84,33 @@ export function WorkCard({
               <option value="concluida">Concluída</option>
             </select>
           ) : null}
-          {canManage ? (
-            <div className="icon-actions">
-              <button
-                className="ghost-button icon-button"
-                onClick={() => onEdit(item)}
-                title="Editar"
-              >
-                <Edit3 size={16} />
-              </button>
-              <button
-                className="danger-button icon-button"
-                onClick={() => onDelete(item.id)}
-                title="Excluir"
-              >
-                <Trash2 size={16} />
-              </button>
-            </div>
-          ) : null}
+          <div className="icon-actions">
+            <button
+              className="ghost-button icon-button"
+              onClick={() => onOpenComments(item.id)}
+              title="Comentários"
+            >
+              <MessageSquare size={16} />
+            </button>
+            {canManage ? (
+              <>
+                <button
+                  className="ghost-button icon-button"
+                  onClick={() => onEdit(item)}
+                  title="Editar"
+                >
+                  <Edit3 size={16} />
+                </button>
+                <button
+                  className="danger-button icon-button"
+                  onClick={() => onDelete(item.id)}
+                  title="Excluir"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </>
+            ) : null}
+          </div>
         </div>
       </div>
     </article>

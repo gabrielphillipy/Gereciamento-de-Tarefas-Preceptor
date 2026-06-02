@@ -37,6 +37,14 @@ export type Attachment = {
   uploadedAt: string;
 };
 
+export type Comment = {
+  id: number;
+  workItemId: number;
+  authorId: string;
+  body: string;
+  createdAt: string;
+};
+
 export type WorkItem = {
   id: number;
   title: string;

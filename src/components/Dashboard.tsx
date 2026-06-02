@@ -37,6 +37,7 @@ import {
 } from "../utils";
 import { AttachmentsField } from "./AttachmentsField";
 import { CalendarView } from "./CalendarView";
+import { CommentsModal } from "./CommentsModal";
 import { IndicatorsPage } from "./IndicatorsPage";
 import { ItemsModal } from "./ItemsModal";
 import { KanbanBoard } from "./KanbanBoard";
@@ -76,6 +77,7 @@ export function Dashboard({
   const [dayModal, setDayModal] = useState<string | null>(null);
   const [metricModal, setMetricModal] = useState<MetricKey | null>(null);
   const [meetingId, setMeetingId] = useState<number | null>(null);
+  const [commentsItemId, setCommentsItemId] = useState<number | null>(null);
   const [recurrenceCount, setRecurrenceCount] = useState(4);
   const [saving, setSaving] = useState(false);
   const [toast, setToast] = useState<{
@@ -205,6 +207,11 @@ export function Dashboard({
   const selectedMeeting =
     meetingId !== null
       ? (items.find((item) => item.id === meetingId) ?? null)
+      : null;
+
+  const selectedCommentItem =
+    commentsItemId !== null
+      ? (items.find((item) => item.id === commentsItemId) ?? null)
       : null;
 
   function resetForm() {
@@ -614,6 +621,7 @@ export function Dashboard({
                   onStatusChange={updateStatus}
                   onEdit={editItem}
                   onDelete={deleteItem}
+                  onOpenComments={(id) => setCommentsItemId(id)}
                   period={calPeriod}
                   onPeriodChange={setCalPeriod}
                   onOpenDay={setDayModal}
@@ -631,6 +639,7 @@ export function Dashboard({
                   onStatusChange={updateStatus}
                   onEdit={editItem}
                   onDelete={deleteItem}
+                  onOpenComments={(id) => setCommentsItemId(id)}
                 />
               )}
             </div>
@@ -861,6 +870,10 @@ export function Dashboard({
             editItem(item);
           }}
           onDelete={deleteItem}
+          onOpenComments={(id) => {
+            setDayModal(null);
+            setCommentsItemId(id);
+          }}
           onClose={() => setDayModal(null)}
         />
       ) : null}
@@ -878,6 +891,10 @@ export function Dashboard({
             editItem(item);
           }}
           onDelete={deleteItem}
+          onOpenComments={(id) => {
+            setMetricModal(null);
+            setCommentsItemId(id);
+          }}
           onClose={() => setMetricModal(null)}
         />
       ) : null}
@@ -889,6 +906,15 @@ export function Dashboard({
           allUsers={allUsers}
           onSave={saveMeeting}
           onClose={() => setMeetingId(null)}
+        />
+      ) : null}
+
+      {selectedCommentItem ? (
+        <CommentsModal
+          item={selectedCommentItem}
+          currentUser={currentUser}
+          allUsers={allUsers}
+          onClose={() => setCommentsItemId(null)}
         />
       ) : null}
 
